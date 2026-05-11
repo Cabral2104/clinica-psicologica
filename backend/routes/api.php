@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CatalogoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -24,13 +25,7 @@ use Illuminate\Support\Facades\Route;
 */
 Route::prefix('v1')->group(function () {
 
-    // Autenticación
-    Route::prefix('auth')->group(function () {
-        Route::post('login', [AuthController::class, 'login'])
-            ->name('auth.login');
-    });
-
-    //Registro de nuevas cuentas (psicológos)
+    //Registro de nuevas cuentas (psicológos) y login de usuarios existentes
     Route::prefix('auth')->group(function () {
         Route::post('login',    [AuthController::class, 'login'])
             ->name('auth.login');
@@ -53,6 +48,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('auth.me');
         Route::post('logout', [AuthController::class, 'logout'])
             ->name('auth.logout');
+    });
+
+    // Catálogos (solo lectura)
+    Route::prefix('catalogos')->group(function () {
+        Route::get('/',         [CatalogoController::class, 'index'])
+            ->name('catalogos.index');
+        Route::get('{grupo}',   [CatalogoController::class, 'porGrupo'])
+            ->name('catalogos.porGrupo');
     });
 
     /*
