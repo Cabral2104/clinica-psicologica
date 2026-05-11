@@ -1,8 +1,70 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CatalogoController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+/*
+|--------------------------------------------------------------------------
+| API Routes — Plataforma de Apoyo Clínico
+|--------------------------------------------------------------------------
+|
+| Convención de nombres:
+|   - Rutas públicas:    sin prefijo de middleware
+|   - Rutas protegidas: middleware 'auth:sanctum'
+|
+| Versión actual: v1
+| Prefijo base:   /api  (configurado en bootstrap/app.php)
+|
+*/
+
+/*
+|--------------------------------------------------------------------------
+| Rutas públicas — No requieren token
+|--------------------------------------------------------------------------
+*/
+Route::prefix('v1')->group(function () {
+
+    //Registro de nuevas cuentas (psicológos) y login de usuarios existentes
+    Route::prefix('auth')->group(function () {
+        Route::post('login',    [AuthController::class, 'login'])
+            ->name('auth.login');
+        Route::post('register', [AuthController::class, 'register'])
+            ->name('auth.register');
+    });
+
+});
+
+/*
+|--------------------------------------------------------------------------
+| Rutas protegidas — Requieren token Sanctum válido
+|--------------------------------------------------------------------------
+*/
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+
+    // Autenticación
+    Route::prefix('auth')->group(function () {
+        Route::get('me',     [AuthController::class, 'me'])
+            ->name('auth.me');
+        Route::post('logout', [AuthController::class, 'logout'])
+            ->name('auth.logout');
+    });
+
+    // Catálogos (solo lectura)
+    Route::prefix('catalogos')->group(function () {
+        Route::get('/',         [CatalogoController::class, 'index'])
+            ->name('catalogos.index');
+        Route::get('{grupo}',   [CatalogoController::class, 'porGrupo'])
+            ->name('catalogos.porGrupo');
+    });
+
+    /*
+    | Los siguientes módulos se irán agregando aquí:
+    |
+    | Route::apiResource('catalogos',  CatalogoController::class);
+    | Route::apiResource('pacientes',  PacienteController::class);
+    | Route::apiResource('sesiones',   SesionController::class);
+    | Route::apiResource('notas',      NotaClinicaController::class);
+    */
+
+});
