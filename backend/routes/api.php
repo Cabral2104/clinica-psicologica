@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogoController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\PacienteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,6 +58,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('{grupo}',   [CatalogoController::class, 'porGrupo'])
             ->name('catalogos.porGrupo');
     });
+
+    // Pacientes (CRUD completo)
+    Route::apiResource('pacientes', PacienteController::class);
 
     /*
     | Los siguientes módulos se irán agregando aquí:
