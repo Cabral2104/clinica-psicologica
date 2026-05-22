@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\PacienteController;
 use App\Http\Controllers\Api\SesionController;
 use App\Http\Controllers\Api\NotaClinicaController;
+use App\Http\Controllers\Api\DiagnosticoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -76,6 +77,18 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('sesiones.update');
         Route::delete('sesiones/{sesion}',  [SesionController::class, 'destroy'])
             ->name('sesiones.destroy');
+
+         // Diagnósticos
+        Route::get('diagnosticos',                [DiagnosticoController::class, 'index'])
+            ->name('diagnosticos.index');
+        Route::post('diagnosticos',               [DiagnosticoController::class, 'store'])
+            ->name('diagnosticos.store');
+        Route::get('diagnosticos/{diagnostico}',  [DiagnosticoController::class, 'show'])
+            ->name('diagnosticos.show');
+        Route::put('diagnosticos/{diagnostico}',  [DiagnosticoController::class, 'update'])
+            ->name('diagnosticos.update');
+        Route::delete('diagnosticos/{diagnostico}', [DiagnosticoController::class, 'destroy'])
+            ->name('diagnosticos.destroy');   
     });
 
     // Nota clínica de una sesión

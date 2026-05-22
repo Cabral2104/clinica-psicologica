@@ -7,6 +7,7 @@ use App\Http\Requests\NotaClinica\StoreNotaRequest;
 use App\Http\Resources\NotaClinicaResource;
 use App\Models\NotaClinica;
 use App\Models\Sesion;
+use App\Services\NlpService;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -18,10 +19,15 @@ use Illuminate\Http\JsonResponse;
  * - Una sesión tiene exactamente UNA nota clínica.
  * - Si la sesión ya tiene nota, el endpoint la actualiza (upsert).
  * - Solo el psicólogo dueño de la sesión puede escribir la nota.
- * - Al guardar la nota, se dispara automáticamente el análisis NLP
+ * - Al guardar la nota, se dispara automáticamente el análisis NLP.
+ * - Si el NLP falla, la nota se guarda igual (diseño defensivo).
  */
 class NotaClinicaController extends Controller
 {
+    public function __construct(
+        private readonly NlpService $nlpService
+    ) {}
+
     /**
      * Verifica que la sesión pertenezca al psicólogo autenticado.
      */
@@ -66,11 +72,14 @@ class NotaClinicaController extends Controller
     /**
      * Crear o actualizar la nota clínica de una sesión (upsert).
      *
-     * Si la sesión ya tiene nota → la actualiza.
-     * Si no tiene nota → la crea.
+     * Flujo:
+     * 1. Valida que la sesión pertenezca al psicólogo.
+     * 2. Guarda o actualiza la nota en BD.
+     * 3. Envía el texto al NLP para análisis de sentimiento.
+     * 4. Recarga la nota con el análisis y la devuelve.
      *
-     * Esto simplifica el frontend: siempre hace POST al mismo endpoint,
-     * sin importar si es creación o edición.
+     * El paso 3 es no bloqueante: si falla, el paso 4 devuelve
+     * el análisis en null pero la nota quedó guardada correctamente.
      *
      * POST /api/v1/sesiones/{sesion}/nota
      */
@@ -82,7 +91,7 @@ class NotaClinicaController extends Controller
             return response()->json(['message' => 'Sesión no encontrada.'], 404);
         }
 
-        // Upsert: actualiza si existe, crea si no existe
+        // Paso 1: Guardar o actualizar la nota (upsert)
         $nota = NotaClinica::updateOrCreate(
             ['sesion_id' => $sesionId],
             [
@@ -91,9 +100,13 @@ class NotaClinicaController extends Controller
             ]
         );
 
-        // Indicamos si fue creación o actualización para el mensaje
         $esNueva = $nota->wasRecentlyCreated;
 
+        // Paso 2: Enviar al NLP para análisis (no bloqueante)
+        // Si falla, el error queda en el log pero la nota está guardada
+        $this->nlpService->analizar($nota);
+
+        // Paso 3: Recargar la nota con el análisis recién guardado
         $nota->load(['analisisSentimiento', 'creador']);
 
         return response()->json([
@@ -101,6 +114,9 @@ class NotaClinicaController extends Controller
                 ? 'Nota clínica registrada correctamente.'
                 : 'Nota clínica actualizada correctamente.',
             'data'    => new NotaClinicaResource($nota),
+            'nlp'     => $nota->analisisSentimiento
+                ? 'Análisis de sentimiento completado.'
+                : 'Análisis de sentimiento no disponible en este momento.',
         ], $esNueva ? 201 : 200);
     }
 }
