@@ -2,7 +2,7 @@
 import React from 'react';
 import { Search, Bell, UserPlus, Menu } from 'lucide-react';
 
-export default function Navbar({ onMenuClick }) {
+export default function Navbar({ onMenuClick , onOpenNewPatient }) {
   return (
     <header className="h-16 md:h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 md:px-8 shrink-0 sticky top-0 z-10">
       
@@ -34,7 +34,10 @@ export default function Navbar({ onMenuClick }) {
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
         </button>
-        <button className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5">
+        <button 
+          onClick={onOpenNewPatient}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
+        >
           <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
           <span className="hidden sm:inline">Nuevo Paciente</span>
         </button>

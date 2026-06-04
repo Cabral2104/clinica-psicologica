@@ -1,33 +1,34 @@
 // Archivo: src/pages/patients/Pacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Search, 
-  Calendar, 
-  Activity, 
-  ChevronDown, 
-  ChevronUp, 
-  Loader2, 
-  FileText,
-  UserPlus
-} from 'lucide-react';
+// ¡AQUÍ ESTABA EL ERROR! Faltaba importar 'Clock'
+import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, UserPlus, Clock } from 'lucide-react';
 import api from '../../services/api';
+import NuevaSesionSlideover from '../../components/patients/NuevaSesionSlideover';
 
 export default function Pacientes() {
   const [patients, setPatients] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Estado para controlar qué paciente está expandido y guardar sus sesiones
   const [expandedPatientId, setExpandedPatientId] = useState(null);
   const [patientSessions, setPatientSessions] = useState({});
   const [loadingSessions, setLoadingSessions] = useState({});
+
+  const [isNuevaSesionOpen, setIsNuevaSesionOpen] = useState(false);
+  const [selectedPacienteIdForSesion, setSelectedPacienteIdForSesion] = useState(null);
+
+  // Función segura para extraer arreglos sin importar cómo los devuelva Laravel (paginados o directos)
+  const extractArray = (res) => {
+    if (Array.isArray(res.data?.data)) return res.data.data;
+    if (Array.isArray(res.data)) return res.data;
+    return [];
+  };
 
   useEffect(() => {
     const fetchPatients = async () => {
       try {
         setIsLoading(true);
         const response = await api.get('/pacientes');
-        setPatients(response.data?.data || []);
+        setPatients(extractArray(response));
       } catch (error) {
         console.error("Error al cargar pacientes:", error);
       } finally {
@@ -37,33 +38,40 @@ export default function Pacientes() {
     fetchPatients();
   }, []);
 
-  // Función para expandir un paciente y buscar sus sesiones en tu API
-  const togglePatient = async (patientId) => {
-    // Si ya está expandido, lo cerramos
-    if (expandedPatientId === patientId) {
-      setExpandedPatientId(null);
-      return;
-    }
-
-    setExpandedPatientId(patientId);
-
-    // Si ya tenemos las sesiones cacheadas en el estado, no hacemos otra petición
-    if (patientSessions[patientId]) return;
-
-    // Si no las tenemos, hacemos la petición a tu endpoint relacional
+  const fetchSesionesPaciente = async (patientId) => {
     try {
       setLoadingSessions(prev => ({ ...prev, [patientId]: true }));
-      
       const response = await api.get(`/pacientes/${patientId}/sesiones`);
-      
       setPatientSessions(prev => ({ 
         ...prev, 
-        [patientId]: response.data?.data || [] 
+        [patientId]: extractArray(response)
       }));
     } catch (error) {
       console.error(`Error al cargar sesiones del paciente ${patientId}:`, error);
     } finally {
       setLoadingSessions(prev => ({ ...prev, [patientId]: false }));
+    }
+  };
+
+  const togglePatient = (patientId) => {
+    if (expandedPatientId === patientId) {
+      setExpandedPatientId(null);
+      return;
+    }
+    setExpandedPatientId(patientId);
+    if (!patientSessions[patientId]) {
+      fetchSesionesPaciente(patientId);
+    }
+  };
+
+  const handleOpenNuevaSesion = (pacienteId) => {
+    setSelectedPacienteIdForSesion(pacienteId);
+    setIsNuevaSesionOpen(true);
+  };
+
+  const handleSesionSuccess = () => {
+    if (selectedPacienteIdForSesion) {
+      fetchSesionesPaciente(selectedPacienteIdForSesion);
     }
   };
 
@@ -77,9 +85,8 @@ export default function Pacientes() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 relative">
       
-      {/* Cabecera del Módulo */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
           <div className="p-4 bg-blue-50 rounded-2xl text-blue-500">
@@ -97,17 +104,12 @@ export default function Pacientes() {
             <input 
               type="text" 
               placeholder="Buscar paciente..." 
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all text-slate-700"
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-teal-500 outline-none transition-all text-slate-700"
             />
           </div>
-          <button className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm shrink-0">
-            <UserPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nuevo</span>
-          </button>
         </div>
       </div>
 
-      {/* Lista de Pacientes (Estilo Acordeón) */}
       <div className="space-y-4">
         {patients.length === 0 ? (
           <div className="bg-white p-12 rounded-[2rem] border border-slate-100 shadow-sm text-center">
@@ -126,7 +128,6 @@ export default function Pacientes() {
                   isExpanded ? 'border-teal-200 shadow-md ring-4 ring-teal-50' : 'border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-200'
                 }`}
               >
-                {/* Fila Principal del Paciente (Clickable) */}
                 <div 
                   onClick={() => togglePatient(paciente.id)}
                   className="p-6 flex flex-col sm:flex-row items-center gap-6 cursor-pointer select-none group"
@@ -140,24 +141,20 @@ export default function Pacientes() {
                         {paciente.nombre} {paciente.apellido_paterno} {paciente.apellido_materno}
                       </h3>
                       <div className="flex items-center gap-3 mt-1">
-                        <p className="text-sm font-medium text-slate-500">{paciente.email}</p>
+                        <p className="text-sm font-medium text-slate-500">{paciente.email || 'Sin correo'}</p>
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                        <p className="text-sm font-medium text-slate-500">{paciente.telefono}</p>
+                        <p className="text-sm font-medium text-slate-500">{paciente.telefono || 'Sin teléfono'}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg border border-emerald-100">
-                      Activo
-                    </span>
                     <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-teal-50 text-teal-600' : 'text-slate-400 group-hover:bg-slate-50'}`}>
                       {isExpanded ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
                     </div>
                   </div>
                 </div>
 
-                {/* Área Expandible: Sesiones del Paciente */}
                 {isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50/50 p-6 md:p-8 animate-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center justify-between mb-6">
@@ -165,7 +162,10 @@ export default function Pacientes() {
                         <FileText className="w-5 h-5 text-teal-500" />
                         Historial de Sesiones
                       </h4>
-                      <button className="text-sm font-bold text-teal-600 hover:text-teal-700 bg-teal-50 px-4 py-2 rounded-xl transition-colors">
+                      <button 
+                        onClick={() => handleOpenNuevaSesion(paciente.id)}
+                        className="text-sm font-bold text-white hover:bg-teal-700 bg-teal-600 px-4 py-2 rounded-xl transition-colors shadow-sm"
+                      >
                         + Agendar Sesión
                       </button>
                     </div>
@@ -176,7 +176,7 @@ export default function Pacientes() {
                       </div>
                     ) : sesiones.length === 0 ? (
                       <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-sm font-medium text-slate-500">
-                        Este paciente aún no tiene sesiones registradas en su expediente.
+                        Este paciente aún no tiene sesiones programadas en su expediente.
                       </div>
                     ) : (
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -187,31 +187,43 @@ export default function Pacientes() {
                                  <Calendar className="w-4 h-4 text-slate-400" />
                                  {sesion.fecha_sesion || sesion.created_at?.split('T')[0]}
                                </div>
-                               <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
-                                 {sesion.hora || 'Sin hora'}
+                               <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                                 Sesión #{sesion.numero_sesion}
                                </span>
                              </div>
                              
-                             <p className="text-sm font-medium text-slate-600 mb-4 line-clamp-2">
-                               {sesion.tipo_consulta || 'Consulta de seguimiento general.'}
-                             </p>
+                             <div className="mb-4">
+                               <p className="text-sm font-bold text-slate-800">
+                                 {sesion.tipo_sesion?.valor || 'Sesión General'}
+                               </p>
+                               <p className="text-xs font-medium text-slate-500 flex items-center gap-1 mt-1">
+                                 <Clock className="w-3 h-3"/> 
+                                 {sesion.hora_inicio ? `${sesion.hora_inicio} - ${sesion.hora_fin || 'N/A'}` : 'Horario por definir'}
+                               </p>
+                             </div>
 
-                             {/* Insignia de IA (Si existe nota clínica analizada) */}
                              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider
-                                  ${sesion.nota_clinica?.analisis_sentimiento?.polaridad === 'Negativa' 
-                                    ? 'bg-rose-50 text-rose-600 border border-rose-100' 
-                                    : sesion.nota_clinica?.analisis_sentimiento?.polaridad === 'Positiva'
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
-                                  }`}
-                                >
-                                  <Activity className="w-3.5 h-3.5" />
-                                  {sesion.nota_clinica?.analisis_sentimiento?.polaridad || 'Sin análisis'}
-                                </div>
+                                {/* Ahora lee correctamente nota_clinica según tu BD de Laravel */}
+                                {sesion.nota_clinica ? (
+                                    <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider
+                                      ${sesion.nota_clinica.analisis_sentimiento?.polaridad === 'Negativa' 
+                                        ? 'bg-rose-50 text-rose-600 border border-rose-100' 
+                                        : sesion.nota_clinica.analisis_sentimiento?.polaridad === 'Positiva'
+                                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                      }`}
+                                    >
+                                      <Activity className="w-3.5 h-3.5" />
+                                      {sesion.nota_clinica.analisis_sentimiento?.polaridad || 'Registrada'}
+                                    </div>
+                                ) : (
+                                  <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-600 border border-amber-100">
+                                    Pendiente de Nota
+                                  </div>
+                                )}
                                 
                                 <button className="text-sm font-bold text-teal-600 hover:text-teal-700 transition-colors">
-                                  Ver detalle
+                                  {sesion.nota_clinica ? 'Ver Expediente' : 'Redactar Nota'}
                                 </button>
                              </div>
                           </div>
@@ -225,6 +237,13 @@ export default function Pacientes() {
           })
         )}
       </div>
+
+      <NuevaSesionSlideover 
+        isOpen={isNuevaSesionOpen} 
+        onClose={() => setIsNuevaSesionOpen(false)}
+        onSuccess={handleSesionSuccess}
+        pacienteId={selectedPacienteIdForSesion}
+      />
     </div>
   );
 }
