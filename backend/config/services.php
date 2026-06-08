@@ -42,7 +42,7 @@ return [
     | URL del servicio de análisis de sentimientos que corre localmente.
     */
     'nlp' => [
-        'url' => env('NLP_SERVICE_URL', 'http://127.0.0.1:8080'),
+        'url' => env('NLP_SERVICE_URL', 'http://127.0.0.1:8001'),
     ],
 
 ];
