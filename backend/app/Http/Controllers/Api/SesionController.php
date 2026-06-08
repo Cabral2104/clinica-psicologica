@@ -53,7 +53,8 @@ class SesionController extends Controller
 
         $sesiones = Sesion::where('paciente_id', $pacienteId)
             ->where('status', true)
-            ->with(['tipoSesion', 'estadoSesion', 'nota'])
+            // CAMBIO AQUÍ: Cargamos anidada la relación camelCase tal cual la definiste en el modelo
+            ->with(['tipoSesion', 'estadoSesion', 'nota.analisisSentimiento'])
             ->orderByDesc('fecha_sesion')
             ->get();
 
@@ -121,7 +122,7 @@ class SesionController extends Controller
             'status'         => true,
         ]);
 
-        $sesion->load(['tipoSesion', 'estadoSesion']);
+        $sesion->load(['tipoSesion', 'estadoSesion', 'nota.analisisSentimiento']);
 
         return response()->json([
             'message' => 'Sesión registrada correctamente.',
@@ -152,7 +153,7 @@ class SesionController extends Controller
         }
 
         $sesion->update($request->validated());
-        $sesion->load(['tipoSesion', 'estadoSesion', 'nota']);
+        $sesion->load(['tipoSesion', 'estadoSesion', 'nota.analisisSentimiento']);
 
         return response()->json([
             'message' => 'Sesión actualizada correctamente.',
