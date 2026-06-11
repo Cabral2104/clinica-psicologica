@@ -14,7 +14,7 @@ use App\Http\Controllers\Api\DiagnosticoController;
 |--------------------------------------------------------------------------
 |
 | Convención de nombres:
-|   - Rutas públicas:    sin prefijo de middleware
+|   - Rutas públicas:   sin prefijo de middleware
 |   - Rutas protegidas: middleware 'auth:sanctum'
 |
 | Versión actual: v1
@@ -50,6 +50,11 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::get('me',     [AuthController::class, 'me'])
             ->name('auth.me');
+            
+        // NUEVA RUTA PARA ACTUALIZAR PERFIL DEL PSICÓLOGO
+        Route::put('perfil', [AuthController::class, 'updateProfile'])
+            ->name('auth.updateProfile');
+            
         Route::post('logout', [AuthController::class, 'logout'])
             ->name('auth.logout');
     });

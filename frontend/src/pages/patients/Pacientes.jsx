@@ -1,8 +1,12 @@
+// Archivo: src/pages/patients/Pacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock } from 'lucide-react';
+// IMPORTANTE: Agregamos el icono 'Edit' de lucide-react
+import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock, Edit } from 'lucide-react';
 import api from '../../services/api';
 import NuevaSesionSlideover from '../../components/patients/NuevaSesionSlideover';
 import RedactarNotaSlideover from '../../components/patients/RedactarNotaSlideover'; 
+// IMPORTAMOS el componente de pacientes para reutilizarlo en modo "Edición"
+import NuevoPacienteSlideover from '../../components/patients/NuevoPacienteSlideover'; 
 
 export default function Pacientes() {
   const [patients, setPatients] = useState([]);
@@ -19,25 +23,33 @@ export default function Pacientes() {
   const [selectedSesionId, setSelectedSesionId] = useState(null);
   const [selectedNota, setSelectedNota] = useState(null);
 
+  // NUEVOS ESTADOS: Para controlar la edición del paciente
+  const [isEditPacienteOpen, setIsEditPacienteOpen] = useState(false);
+  const [pacienteToEdit, setPacienteToEdit] = useState(null);
+
   const extractArray = (res) => {
     if (Array.isArray(res.data?.data)) return res.data.data;
     if (Array.isArray(res.data)) return res.data;
     return [];
   };
 
+  // Extraemos la función de fetch y le agregamos un parámetro 'showLoader'
+  // Esto nos permite actualizar los datos en segundo plano sin mostrar la pantalla de carga
+  const fetchPatients = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      const response = await api.get('/pacientes');
+      setPatients(extractArray(response));
+    } catch (error) {
+      console.error("Error al cargar pacientes:", error);
+    } finally {
+      if (showLoader) setIsLoading(false);
+    }
+  };
+
+  // Se ejecuta solo al cargar la página por primera vez
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get('/pacientes');
-        setPatients(extractArray(response));
-      } catch (error) {
-        console.error("Error al cargar pacientes:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchPatients();
+    fetchPatients(true);
   }, []);
 
   const fetchSesionesPaciente = async (patientId) => {
@@ -78,13 +90,23 @@ export default function Pacientes() {
     setIsNotaOpen(true);
   };
 
+  // Función que abre el formulario pasándole los datos
+  const handleOpenEditPaciente = (paciente) => {
+    setPacienteToEdit(paciente);
+    setIsEditPacienteOpen(true);
+  };
+
+  // Al guardar la edición exitosamente, refrescamos la lista en silencio
+  const handlePacienteEditSuccess = () => {
+    fetchPatients(false); 
+  };
+
   const handleSesionSuccess = () => {
     if (selectedPacienteIdForSesion) {
       fetchSesionesPaciente(selectedPacienteIdForSesion);
     }
   };
 
-  // Función actualizada: Ahora extrae, calcula y formatea el Score a porcentaje
   const getBadgeInfo = (nota) => {
     if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500 border-slate-200' };
     
@@ -93,7 +115,6 @@ export default function Pacientes() {
     if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400 border-slate-200' };
     
     const stars = analisis.estrellas;
-    // Multiplicamos el decimal por 100 y lo dejamos a 1 decimal (ej. 85.4%)
     const formattedScore = analisis.score ? `${(analisis.score * 100).toFixed(1)}%` : null;
 
     if (stars >= 4) return { text: 'Positiva', score: formattedScore, colorCls: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
@@ -143,6 +164,7 @@ export default function Pacientes() {
 
             return (
               <div key={paciente.id} className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-teal-200 shadow-md ring-4 ring-teal-50' : 'border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-200'}`}>
+                
                 <div onClick={() => togglePatient(paciente.id)} className="p-6 flex flex-col sm:flex-row items-center gap-6 cursor-pointer select-none group">
                   <div className="flex items-center gap-5 flex-1 w-full">
                     <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center font-bold text-teal-700 text-2xl border border-teal-100 shadow-sm shrink-0">
@@ -159,7 +181,20 @@ export default function Pacientes() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
+                  
+                  {/* BOTON DE EDICIÓN AÑADIDO AQUÍ */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation(); // Evita que se despliegue el acordeón al hacer clic en editar
+                        handleOpenEditPaciente(paciente);
+                      }}
+                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
+                      title="Editar Expediente"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    
                     <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-teal-50 text-teal-600' : 'text-slate-400 group-hover:bg-slate-50'}`}>
                       {isExpanded ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
                     </div>
@@ -227,7 +262,6 @@ export default function Pacientes() {
                                       <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border ${badge.colorCls}`}>
                                         <Activity className="w-3.5 h-3.5" />
                                         <span>{badge.text}</span>
-                                        {/* Aquí se inyecta la puntuación si existe */}
                                         {badge.score && (
                                           <span className="border-l border-current pl-1.5 ml-0.5 opacity-80">
                                             {badge.score}
@@ -260,6 +294,7 @@ export default function Pacientes() {
         )}
       </div>
 
+      {/* Componentes Deslizables (Slideovers) */}
       <NuevaSesionSlideover 
         isOpen={isNuevaSesionOpen} 
         onClose={() => setIsNuevaSesionOpen(false)}
@@ -273,6 +308,17 @@ export default function Pacientes() {
         onSuccess={handleSesionSuccess} 
         sesionId={selectedSesionId}
         notaExistente={selectedNota} 
+      />
+
+      {/* NUEVO SLIDEOVER PARA EDICIÓN DE PACIENTES */}
+      <NuevoPacienteSlideover
+        isOpen={isEditPacienteOpen}
+        onClose={() => {
+          setIsEditPacienteOpen(false);
+          setPacienteToEdit(null); // Limpiamos el estado al cerrar
+        }}
+        onSuccess={handlePacienteEditSuccess}
+        pacienteEditando={pacienteToEdit}
       />
 
     </div>

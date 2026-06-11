@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Calendar, Phone, FileText, Loader2, AlertCircle, Activity } from 'lucide-react';
 import api from '../../services/api';
 
-// Añadimos el prop "pacienteEditando" (si viene nulo, creamos; si trae datos, editamos)
 export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pacienteEditando = null }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -13,7 +12,6 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
     estadosPaciente: []
   });
   
-  // Añadimos los campos clínicos a la estructura base
   const estadoInicial = {
     nombre: '',
     apellido_paterno: '',
@@ -31,7 +29,6 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
 
   const [formData, setFormData] = useState(estadoInicial);
 
-  // 1. Cargar catálogos
   useEffect(() => {
     if (isOpen) {
       const fetchCatalogos = async () => {
@@ -45,9 +42,7 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
           const estados = estadosResponse.data?.data || [];
           setCatalogos({ generos, estadosPaciente: estados });
 
-          // Lógica de llenado de formulario
           if (pacienteEditando) {
-            // MODO EDICIÓN: Llenamos con los datos del paciente
             setFormData({
               nombre: pacienteEditando.nombre || '',
               apellido_paterno: pacienteEditando.apellido_paterno || '',
@@ -55,33 +50,31 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
               fecha_nacimiento: pacienteEditando.fecha_nacimiento || '',
               telefono: pacienteEditando.telefono || '',
               email: pacienteEditando.email || '',
-              genero_id: pacienteEditando.genero_id || '',
-              estado_paciente_id: pacienteEditando.estado_paciente_id || '',
+              // Extracción defensiva de IDs
+              genero_id: pacienteEditando.genero_id || pacienteEditando.genero?.id || '',
+              estado_paciente_id: pacienteEditando.estado_paciente_id || pacienteEditando.estado_paciente?.id || '',
               motivo_consulta: pacienteEditando.motivo_consulta || '',
               antecedentes_personales: pacienteEditando.antecedentes_personales || '',
               antecedentes_familiares: pacienteEditando.antecedentes_familiares || '',
               medicacion_actual: pacienteEditando.medicacion_actual || ''
             });
           } else {
-            // MODO CREACIÓN: Pre-seleccionamos el estado "Activo"
             const estadoActivo = estados.find(e => e.valor === 'Activo');
             setFormData(prev => ({ 
               ...estadoInicial, 
               estado_paciente_id: estadoActivo ? estadoActivo.id : '' 
             }));
           }
-
         } catch (error) {
           console.error("Error cargando catálogos:", error);
         }
       };
       fetchCatalogos();
     } else {
-      // Limpiamos errores y formulario al cerrar el panel
       setErrors({});
       setFormData(estadoInicial);
     }
-  }, [isOpen, pacienteEditando]); // Se ejecuta al abrir o si cambia el paciente a editar
+  }, [isOpen, pacienteEditando]); 
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -97,10 +90,8 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
 
     try {
       if (pacienteEditando) {
-        // Si estamos editando, hacemos PUT a la ruta del paciente específico
         await api.put(`/pacientes/${pacienteEditando.id}`, formData);
       } else {
-        // Si es nuevo, hacemos POST a la ruta general
         await api.post('/pacientes', formData);
       }
       
@@ -150,7 +141,6 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
 
           <form id="paciente-form" onSubmit={handleSubmit} className="space-y-6">
             
-            {/* SECCIÓN IDENTIDAD Y CONTACTO (Igual que antes...) */}
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <User className="w-4 h-4 text-teal-600" /> Identidad
@@ -192,7 +182,6 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
                   </div>
                 </div>
 
-                {/* Si estamos editando, permitimos cambiar el estado del paciente (Alta, Baja, etc) */}
                 {pacienteEditando && (
                   <div>
                      <label className="block text-sm font-bold text-slate-700 mb-1">Estado del Paciente</label>
@@ -228,7 +217,6 @@ export default function NuevoPacienteSlideover({ isOpen, onClose, onSuccess, pac
 
             <hr className="border-slate-100" />
 
-            {/* NUEVA SECCIÓN CLÍNICA AMPLIADA */}
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-teal-600" /> Clínico y Antecedentes
