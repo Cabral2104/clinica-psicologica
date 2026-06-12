@@ -1,8 +1,11 @@
+// Archivo: src/pages/patients/Pacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock } from 'lucide-react';
+import { useLocation } from 'react-router-dom'; // <-- NUEVO: Para recibir el estado oculto
+import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock, Edit } from 'lucide-react';
 import api from '../../services/api';
 import NuevaSesionSlideover from '../../components/patients/NuevaSesionSlideover';
 import RedactarNotaSlideover from '../../components/patients/RedactarNotaSlideover'; 
+import NuevoPacienteSlideover from '../../components/patients/NuevoPacienteSlideover'; 
 
 export default function Pacientes() {
   const [patients, setPatients] = useState([]);
@@ -19,26 +22,57 @@ export default function Pacientes() {
   const [selectedSesionId, setSelectedSesionId] = useState(null);
   const [selectedNota, setSelectedNota] = useState(null);
 
+  const [isEditPacienteOpen, setIsEditPacienteOpen] = useState(false);
+  const [pacienteToEdit, setPacienteToEdit] = useState(null);
+
+  // NUEVO: Instanciamos location para atrapar el ID que viene de la agenda
+  const location = useLocation();
+
   const extractArray = (res) => {
     if (Array.isArray(res.data?.data)) return res.data.data;
     if (Array.isArray(res.data)) return res.data;
     return [];
   };
 
+  const fetchPatients = async (showLoader = true) => {
+    try {
+      if (showLoader) setIsLoading(true);
+      const response = await api.get('/pacientes');
+      const data = extractArray(response);
+      setPatients(data);
+      return data; // Retornamos los datos para poder usarlos inmediatamente en el useEffect
+    } catch (error) {
+      console.error("Error al cargar pacientes:", error);
+      return [];
+    } finally {
+      if (showLoader) setIsLoading(false);
+    }
+  };
+
+  // NUEVO: Lógica combinada para cargar pacientes y auto-expandir si venimos de la Agenda
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get('/pacientes');
-        setPatients(extractArray(response));
-      } catch (error) {
-        console.error("Error al cargar pacientes:", error);
-      } finally {
-        setIsLoading(false);
+    const initializePage = async () => {
+      const fetchedPatients = await fetchPatients(true);
+      
+      // Si recibimos la señal de abrir un paciente específico (State Passing)
+      if (location.state && location.state.openPatientId) {
+        const targetId = location.state.openPatientId;
+        
+        // Verificamos que el paciente realmente exista en la lista
+        const pacienteExiste = fetchedPatients.some(p => p.id === targetId);
+        if (pacienteExiste) {
+          setExpandedPatientId(targetId);
+          fetchSesionesPaciente(targetId);
+          
+          // Limpiamos el history state para que si el usuario recarga la página, 
+          // no se vuelva a abrir automáticamente
+          window.history.replaceState({}, document.title);
+        }
       }
     };
-    fetchPatients();
-  }, []);
+
+    initializePage();
+  }, [location]);
 
   const fetchSesionesPaciente = async (patientId) => {
     try {
@@ -78,13 +112,21 @@ export default function Pacientes() {
     setIsNotaOpen(true);
   };
 
+  const handleOpenEditPaciente = (paciente) => {
+    setPacienteToEdit(paciente);
+    setIsEditPacienteOpen(true);
+  };
+
+  const handlePacienteEditSuccess = () => {
+    fetchPatients(false); 
+  };
+
   const handleSesionSuccess = () => {
     if (selectedPacienteIdForSesion) {
       fetchSesionesPaciente(selectedPacienteIdForSesion);
     }
   };
 
-  // Función actualizada: Ahora extrae, calcula y formatea el Score a porcentaje
   const getBadgeInfo = (nota) => {
     if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500 border-slate-200' };
     
@@ -93,7 +135,6 @@ export default function Pacientes() {
     if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400 border-slate-200' };
     
     const stars = analisis.estrellas;
-    // Multiplicamos el decimal por 100 y lo dejamos a 1 decimal (ej. 85.4%)
     const formattedScore = analisis.score ? `${(analisis.score * 100).toFixed(1)}%` : null;
 
     if (stars >= 4) return { text: 'Positiva', score: formattedScore, colorCls: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
@@ -143,6 +184,7 @@ export default function Pacientes() {
 
             return (
               <div key={paciente.id} className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-teal-200 shadow-md ring-4 ring-teal-50' : 'border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-200'}`}>
+                
                 <div onClick={() => togglePatient(paciente.id)} className="p-6 flex flex-col sm:flex-row items-center gap-6 cursor-pointer select-none group">
                   <div className="flex items-center gap-5 flex-1 w-full">
                     <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center font-bold text-teal-700 text-2xl border border-teal-100 shadow-sm shrink-0">
@@ -159,7 +201,19 @@ export default function Pacientes() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
+                  
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation(); 
+                        handleOpenEditPaciente(paciente);
+                      }}
+                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
+                      title="Editar Expediente"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    
                     <div className={`p-2 rounded-xl transition-colors ${isExpanded ? 'bg-teal-50 text-teal-600' : 'text-slate-400 group-hover:bg-slate-50'}`}>
                       {isExpanded ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
                     </div>
@@ -227,7 +281,6 @@ export default function Pacientes() {
                                       <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border ${badge.colorCls}`}>
                                         <Activity className="w-3.5 h-3.5" />
                                         <span>{badge.text}</span>
-                                        {/* Aquí se inyecta la puntuación si existe */}
                                         {badge.score && (
                                           <span className="border-l border-current pl-1.5 ml-0.5 opacity-80">
                                             {badge.score}
@@ -273,6 +326,16 @@ export default function Pacientes() {
         onSuccess={handleSesionSuccess} 
         sesionId={selectedSesionId}
         notaExistente={selectedNota} 
+      />
+
+      <NuevoPacienteSlideover
+        isOpen={isEditPacienteOpen}
+        onClose={() => {
+          setIsEditPacienteOpen(false);
+          setPacienteToEdit(null); 
+        }}
+        onSuccess={handlePacienteEditSuccess}
+        pacienteEditando={pacienteToEdit}
       />
 
     </div>

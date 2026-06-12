@@ -139,4 +139,31 @@ class AuthController extends Controller
             'message' => 'Sesión cerrada correctamente.',
         ], 200);
     }
+
+
+    public function updateProfile(\Illuminate\Http\Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'password' => 'nullable|string|min:8|confirmed', // Solo si quiere cambiarla
+        ]);
+
+        $user->name = $request->name;
+        $user->email = $request->email;
+
+        // Si el usuario escribió una nueva contraseña, la encriptamos y guardamos
+        if ($request->filled('password')) {
+            $user->password = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Perfil actualizado exitosamente.',
+            'user'    => $user
+        ]);
+    }
 }

@@ -5,12 +5,6 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/**
- * PacienteResource
- *
- * Define la estructura JSON que se devuelve al frontend
- * para un paciente. Incluye relaciones cargadas.
- */
 class PacienteResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -22,13 +16,19 @@ class PacienteResource extends JsonResource
             'nombre'                => $this->nombre,
             'apellido_paterno'      => $this->apellido_paterno,
             'apellido_materno'      => $this->apellido_materno,
-            'nombre_completo'       => $this->nombre_completo, // accessor del modelo
+            'nombre_completo'       => $this->nombre_completo,
             'fecha_nacimiento'      => $this->fecha_nacimiento?->format('Y-m-d'),
             'edad'                  => $this->fecha_nacimiento?->age,
             'lugar_nacimiento'      => $this->lugar_nacimiento,
             'curp'                  => $this->curp,
 
-            // Catálogos (se cargan con eager loading)
+            // Agregamos explícitamente los IDs de los catálogos para facilitar la edición
+            'genero_id'             => $this->genero_id,
+            'estado_civil_id'       => $this->estado_civil_id,
+            'escolaridad_id'        => $this->escolaridad_id,
+            'estado_paciente_id'    => $this->estado_paciente_id,
+
+            // Catálogos
             'genero'                => $this->whenLoaded('genero', fn() => [
                 'id'    => $this->genero->id,
                 'clave' => $this->genero->clave,
@@ -50,12 +50,10 @@ class PacienteResource extends JsonResource
                 'valor' => $this->estadoPaciente->valor,
             ]),
 
-            // Contacto
             'telefono'              => $this->telefono,
             'celular'               => $this->celular,
             'email'                 => $this->email,
 
-            // Dirección
             'direccion'             => [
                 'calle'          => $this->calle,
                 'colonia'        => $this->colonia,
@@ -64,26 +62,21 @@ class PacienteResource extends JsonResource
                 'codigo_postal'  => $this->codigo_postal,
             ],
 
-            // Datos laborales
             'ocupacion'             => $this->ocupacion,
             'lugar_trabajo'         => $this->lugar_trabajo,
 
-            // Clínicos
             'motivo_consulta'       => $this->motivo_consulta,
             'antecedentes_personales' => $this->antecedentes_personales,
             'antecedentes_familiares' => $this->antecedentes_familiares,
             'medicacion_actual'     => $this->medicacion_actual,
 
-            // Relaciones opcionales (solo en detalle)
             'contactos_emergencia'  => $this->whenLoaded('contactosEmergencia'),
             'diagnosticos'          => $this->whenLoaded('diagnosticos'),
 
-            // Estadísticas rápidas
             'total_sesiones'        => $this->whenLoaded('sesiones',
                 fn() => $this->sesiones->count()
             ),
 
-            // Auditoría
             'status'                => $this->status,
             'created_at'            => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at'            => $this->updated_at?->format('Y-m-d H:i:s'),

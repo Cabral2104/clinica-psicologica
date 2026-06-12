@@ -189,4 +189,36 @@ class SesionController extends Controller
             'message' => 'Sesión desactivada correctamente.',
         ], 200);
     }
+
+    // Próximas sesiones de todos los pacientes para mostrarlas en el calendario del psicólogo
+    public function proximas(\Illuminate\Http\Request $request)
+    {
+        $query = \App\Models\Sesion::with([
+                'paciente', 
+                'tipoSesion', 
+                'estadoSesion'
+            ])
+            ->where('status', true);
+
+        // Si React nos manda un rango de fechas visible (FullCalendar)
+        if ($request->has('start') && $request->has('end')) {
+            // Extraemos solo el YYYY-MM-DD del formato ISO que manda FullCalendar
+            $start = substr($request->input('start'), 0, 10);
+            $end = substr($request->input('end'), 0, 10);
+            
+            $query->whereBetween('fecha_sesion', [$start, $end]);
+        } else {
+            // Comportamiento original (ej. para la campana de notificaciones)
+            $query->whereDate('fecha_sesion', '>=', now()->toDateString());
+        }
+
+        $sesiones = $query->orderBy('fecha_sesion', 'asc')
+                          ->orderBy('hora_inicio', 'asc')
+                          ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $sesiones
+        ]);
+    }
 }

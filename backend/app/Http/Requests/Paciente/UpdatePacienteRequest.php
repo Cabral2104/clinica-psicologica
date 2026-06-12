@@ -4,16 +4,6 @@ namespace App\Http\Requests\Paciente;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-/**
- * UpdatePacienteRequest
- *
- * Similar a StorePacienteRequest pero con 'sometimes' para que
- * solo se validen los campos que se envíen en la petición.
- * Esto permite actualizaciones parciales (PATCH).
- *
- * La validación unique de CURP ignora el registro actual del paciente
- * para que no falle si se actualiza sin cambiar la CURP.
- */
 class UpdatePacienteRequest extends FormRequest
 {
     public function authorize(): bool
@@ -23,8 +13,11 @@ class UpdatePacienteRequest extends FormRequest
 
     public function rules(): array
     {
-        // Obtenemos el ID del paciente desde la ruta: /pacientes/{paciente}
-        $pacienteId = $this->route('paciente');
+        // Obtenemos el paciente de la ruta
+        $paciente = $this->route('paciente');
+        
+        // Extraemos solo el ID para evitar que el 'unique' colapse
+        $pacienteId = is_object($paciente) ? $paciente->id : $paciente;
 
         return [
             'nombre'                => ['sometimes', 'required', 'string', 'max:100'],
@@ -34,7 +27,7 @@ class UpdatePacienteRequest extends FormRequest
             'lugar_nacimiento'      => ['nullable', 'string', 'max:150'],
             'curp'                  => [
                 'nullable', 'string', 'size:18',
-                "unique:pacientes,curp,{$pacienteId}",  // Ignora el registro actual
+                "unique:pacientes,curp,{$pacienteId}",  // Ya tiene el ID limpio
             ],
             'genero_id'             => ['sometimes', 'required', 'integer', 'exists:catalogos,id'],
             'estado_civil_id'       => ['nullable', 'integer', 'exists:catalogos,id'],
