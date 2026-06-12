@@ -67,6 +67,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('catalogos.porGrupo');
     });
 
+    // Próximas Citas (Agenda General)
+    Route::get('sesiones/proximas', [SesionController::class, 'proximas'])
+        ->name('sesiones.proximas');
+
     // Pacientes (CRUD completo)
     Route::apiResource('pacientes', PacienteController::class);
 

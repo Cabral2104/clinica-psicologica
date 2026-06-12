@@ -1,11 +1,10 @@
 // Archivo: src/pages/patients/Pacientes.jsx
 import React, { useState, useEffect } from 'react';
-// IMPORTANTE: Agregamos el icono 'Edit' de lucide-react
+import { useLocation } from 'react-router-dom'; // <-- NUEVO: Para recibir el estado oculto
 import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock, Edit } from 'lucide-react';
 import api from '../../services/api';
 import NuevaSesionSlideover from '../../components/patients/NuevaSesionSlideover';
 import RedactarNotaSlideover from '../../components/patients/RedactarNotaSlideover'; 
-// IMPORTAMOS el componente de pacientes para reutilizarlo en modo "Edición"
 import NuevoPacienteSlideover from '../../components/patients/NuevoPacienteSlideover'; 
 
 export default function Pacientes() {
@@ -23,9 +22,11 @@ export default function Pacientes() {
   const [selectedSesionId, setSelectedSesionId] = useState(null);
   const [selectedNota, setSelectedNota] = useState(null);
 
-  // NUEVOS ESTADOS: Para controlar la edición del paciente
   const [isEditPacienteOpen, setIsEditPacienteOpen] = useState(false);
   const [pacienteToEdit, setPacienteToEdit] = useState(null);
+
+  // NUEVO: Instanciamos location para atrapar el ID que viene de la agenda
+  const location = useLocation();
 
   const extractArray = (res) => {
     if (Array.isArray(res.data?.data)) return res.data.data;
@@ -33,24 +34,45 @@ export default function Pacientes() {
     return [];
   };
 
-  // Extraemos la función de fetch y le agregamos un parámetro 'showLoader'
-  // Esto nos permite actualizar los datos en segundo plano sin mostrar la pantalla de carga
   const fetchPatients = async (showLoader = true) => {
     try {
       if (showLoader) setIsLoading(true);
       const response = await api.get('/pacientes');
-      setPatients(extractArray(response));
+      const data = extractArray(response);
+      setPatients(data);
+      return data; // Retornamos los datos para poder usarlos inmediatamente en el useEffect
     } catch (error) {
       console.error("Error al cargar pacientes:", error);
+      return [];
     } finally {
       if (showLoader) setIsLoading(false);
     }
   };
 
-  // Se ejecuta solo al cargar la página por primera vez
+  // NUEVO: Lógica combinada para cargar pacientes y auto-expandir si venimos de la Agenda
   useEffect(() => {
-    fetchPatients(true);
-  }, []);
+    const initializePage = async () => {
+      const fetchedPatients = await fetchPatients(true);
+      
+      // Si recibimos la señal de abrir un paciente específico (State Passing)
+      if (location.state && location.state.openPatientId) {
+        const targetId = location.state.openPatientId;
+        
+        // Verificamos que el paciente realmente exista en la lista
+        const pacienteExiste = fetchedPatients.some(p => p.id === targetId);
+        if (pacienteExiste) {
+          setExpandedPatientId(targetId);
+          fetchSesionesPaciente(targetId);
+          
+          // Limpiamos el history state para que si el usuario recarga la página, 
+          // no se vuelva a abrir automáticamente
+          window.history.replaceState({}, document.title);
+        }
+      }
+    };
+
+    initializePage();
+  }, [location]);
 
   const fetchSesionesPaciente = async (patientId) => {
     try {
@@ -90,13 +112,11 @@ export default function Pacientes() {
     setIsNotaOpen(true);
   };
 
-  // Función que abre el formulario pasándole los datos
   const handleOpenEditPaciente = (paciente) => {
     setPacienteToEdit(paciente);
     setIsEditPacienteOpen(true);
   };
 
-  // Al guardar la edición exitosamente, refrescamos la lista en silencio
   const handlePacienteEditSuccess = () => {
     fetchPatients(false); 
   };
@@ -182,11 +202,10 @@ export default function Pacientes() {
                     </div>
                   </div>
                   
-                  {/* BOTON DE EDICIÓN AÑADIDO AQUÍ */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button 
                       onClick={(e) => {
-                        e.stopPropagation(); // Evita que se despliegue el acordeón al hacer clic en editar
+                        e.stopPropagation(); 
                         handleOpenEditPaciente(paciente);
                       }}
                       className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
@@ -294,7 +313,6 @@ export default function Pacientes() {
         )}
       </div>
 
-      {/* Componentes Deslizables (Slideovers) */}
       <NuevaSesionSlideover 
         isOpen={isNuevaSesionOpen} 
         onClose={() => setIsNuevaSesionOpen(false)}
@@ -310,12 +328,11 @@ export default function Pacientes() {
         notaExistente={selectedNota} 
       />
 
-      {/* NUEVO SLIDEOVER PARA EDICIÓN DE PACIENTES */}
       <NuevoPacienteSlideover
         isOpen={isEditPacienteOpen}
         onClose={() => {
           setIsEditPacienteOpen(false);
-          setPacienteToEdit(null); // Limpiamos el estado al cerrar
+          setPacienteToEdit(null); 
         }}
         onSuccess={handlePacienteEditSuccess}
         pacienteEditando={pacienteToEdit}

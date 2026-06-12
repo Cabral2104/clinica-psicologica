@@ -189,4 +189,25 @@ class SesionController extends Controller
             'message' => 'Sesión desactivada correctamente.',
         ], 200);
     }
+
+    // Próximas sesiones de todos los pacientes para mostrarlas en el calendario del psicólogo
+    public function proximas()
+    {
+        // Consultamos las sesiones donde la fecha sea hoy o en el futuro
+        $sesiones = \App\Models\Sesion::with([
+                'paciente', // Cargamos los datos del paciente
+                'tipoSesion', 
+                'estadoSesion'
+            ])
+            ->whereDate('fecha_sesion', '>=', now()->toDateString())
+            ->where('status', true) // Solo sesiones activas (no borradas)
+            ->orderBy('fecha_sesion', 'asc') // Las más prontas primero
+            ->orderBy('hora_inicio', 'asc')  // Ordenadas por hora dentro del mismo día
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $sesiones
+        ]);
+    }
 }
