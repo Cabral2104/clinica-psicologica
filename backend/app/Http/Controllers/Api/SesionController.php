@@ -191,19 +191,30 @@ class SesionController extends Controller
     }
 
     // Próximas sesiones de todos los pacientes para mostrarlas en el calendario del psicólogo
-    public function proximas()
+    public function proximas(\Illuminate\Http\Request $request)
     {
-        // Consultamos las sesiones donde la fecha sea hoy o en el futuro
-        $sesiones = \App\Models\Sesion::with([
-                'paciente', // Cargamos los datos del paciente
+        $query = \App\Models\Sesion::with([
+                'paciente', 
                 'tipoSesion', 
                 'estadoSesion'
             ])
-            ->whereDate('fecha_sesion', '>=', now()->toDateString())
-            ->where('status', true) // Solo sesiones activas (no borradas)
-            ->orderBy('fecha_sesion', 'asc') // Las más prontas primero
-            ->orderBy('hora_inicio', 'asc')  // Ordenadas por hora dentro del mismo día
-            ->get();
+            ->where('status', true);
+
+        // Si React nos manda un rango de fechas visible (FullCalendar)
+        if ($request->has('start') && $request->has('end')) {
+            // Extraemos solo el YYYY-MM-DD del formato ISO que manda FullCalendar
+            $start = substr($request->input('start'), 0, 10);
+            $end = substr($request->input('end'), 0, 10);
+            
+            $query->whereBetween('fecha_sesion', [$start, $end]);
+        } else {
+            // Comportamiento original (ej. para la campana de notificaciones)
+            $query->whereDate('fecha_sesion', '>=', now()->toDateString());
+        }
+
+        $sesiones = $query->orderBy('fecha_sesion', 'asc')
+                          ->orderBy('hora_inicio', 'asc')
+                          ->get();
 
         return response()->json([
             'success' => true,
