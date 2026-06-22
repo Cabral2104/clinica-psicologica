@@ -33,7 +33,16 @@ class DashboardController extends Controller
                 Log::warning("La relación 'paciente' no existe en el modelo Sesion.");
             }
 
-            $alertasIA = 0; 
+            // 3. Alertas IA (Notas con 1 o 2 estrellas = Negativo/Riesgo)
+            $misSesionesIds = \App\Models\Sesion::whereHas('paciente', function($query) use ($userId) {
+                $query->where('user_id', $userId);
+            })->pluck('id');
+
+            $misNotasIds = \App\Models\NotaClinica::whereIn('sesion_id', $misSesionesIds)->pluck('id');
+
+            $alertasIA = \App\Models\AnalisisSentimiento::whereIn('nota_clinica_id', $misNotasIds)
+                                    ->where('estrellas', '<=', 2)
+                                    ->count();
 
             // 4. Directorio rápido (Últimos 4 registros incluyendo el campo status)
             $pacientesRecientes = Paciente::where('user_id', $userId)

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\SesionController;
 use App\Http\Controllers\Api\NotaClinicaController;
 use App\Http\Controllers\Api\DiagnosticoController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\AnalisisController; // <-- NUEVA IMPORTACIÓN
 
 /*
 |--------------------------------------------------------------------------
@@ -68,9 +69,13 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('catalogos.porGrupo');
     });
 
-    // NUEVA RUTA: Resumen General de Métricas (Dashboard)
+    // Resumen General de Métricas (Dashboard)
     Route::get('dashboard/resumen', [DashboardController::class, 'resumen'])
         ->name('dashboard.resumen');
+
+    // NUEVA RUTA: Historial de Análisis NLP
+    Route::get('analisis/historial', [AnalisisController::class, 'index'])
+        ->name('analisis.index');
 
     // Próximas Citas (Agenda General)
     Route::get('sesiones/proximas', [SesionController::class, 'proximas'])
@@ -116,14 +121,5 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('nota', [NotaClinicaController::class, 'store'])
             ->name('nota.store');
     });
-
-    /*
-    | Los siguientes módulos se irán agregando aquí:
-    |
-    | Route::apiResource('catalogos',  CatalogoController::class);
-    | Route::apiResource('pacientes',  PacienteController::class);
-    | Route::apiResource('sesiones',   SesionController::class);
-    | Route::apiResource('notas',      NotaClinicaController::class);
-    */
 
 });
