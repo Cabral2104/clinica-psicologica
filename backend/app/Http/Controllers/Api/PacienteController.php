@@ -33,37 +33,26 @@ class PacienteController extends Controller
      *
      * GET /api/v1/pacientes
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index()
     {
-        $query = Paciente::where('user_id', auth()->id())
-            ->where('status', true)
-            ->with(['genero', 'estadoPaciente']);
+        try {
+            // 1. Usamos la ruta absoluta \App\Models\Paciente para evitar errores si falta el "use" arriba
+            $pacientes = \App\Models\Paciente::where('user_id', auth()->id())
+                                 ->orderBy('created_at', 'desc')
+                                 ->get();
 
-        // Búsqueda por texto
-        if ($request->filled('buscar')) {
-            $buscar = $request->buscar;
-            $query->where(function ($q) use ($buscar) {
-                $q->where('nombre', 'like', "%{$buscar}%")
-                  ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
-                  ->orWhere('apellido_materno', 'like', "%{$buscar}%")
-                  ->orWhere('email', 'like', "%{$buscar}%")
-                  ->orWhere('curp', 'like', "%{$buscar}%");
-            });
+            // 2. Restauramos el uso de tu Resource para que Laravel parsee los datos correctamente
+            return \App\Http\Resources\PacienteResource::collection($pacientes);
+
+        } catch (\Exception $e) {
+            // Si Laravel falla, ya no mandará un 500 en blanco, nos dirá la línea y el motivo exacto
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cargar pacientes',
+                'error_real' => $e->getMessage(),
+                'linea' => $e->getLine()
+            ], 500);
         }
-
-        // Filtro por estado del paciente
-        if ($request->filled('estado')) {
-            $query->whereHas('estadoPaciente', function ($q) use ($request) {
-                $q->where('clave', $request->estado);
-            });
-        }
-
-        $porPagina = $request->input('por_pagina', 15);
-        $pacientes = $query->orderBy('apellido_paterno')
-                           ->orderBy('nombre')
-                           ->paginate($porPagina);
-
-        return PacienteResource::collection($pacientes);
     }
 
     /**
@@ -183,5 +172,26 @@ class PacienteController extends Controller
         return response()->json([
             'message' => 'Paciente desactivado correctamente.',
         ], 200);
+    }
+
+    public function toggleStatus($id)
+    {
+        try {
+            $paciente = \App\Models\Paciente::where('user_id', auth()->id())->findOrFail($id);
+            $paciente->status = !$paciente->status;
+            $paciente->save();
+
+            return response()->json([
+                'success' => true, 
+                'message' => 'Estado del paciente actualizado',
+                'data' => $paciente
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cambiar estado',
+                'error_real' => $e->getMessage()
+            ], 500);
+        }
     }
 }
