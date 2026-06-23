@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\PacienteController;
 use App\Http\Controllers\Api\SesionController;
 use App\Http\Controllers\Api\NotaClinicaController;
 use App\Http\Controllers\Api\DiagnosticoController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\AnalisisController; // <-- NUEVA IMPORTACIÓN
 
 /*
 |--------------------------------------------------------------------------
@@ -29,7 +31,7 @@ use App\Http\Controllers\Api\DiagnosticoController;
 */
 Route::prefix('v1')->group(function () {
 
-    //Registro de nuevas cuentas (psicológos) y login de usuarios existentes
+    // Registro de nuevas cuentas (psicólogos) y login de usuarios existentes
     Route::prefix('auth')->group(function () {
         Route::post('login',    [AuthController::class, 'login'])
             ->name('auth.login');
@@ -51,7 +53,7 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::get('me',     [AuthController::class, 'me'])
             ->name('auth.me');
             
-        // NUEVA RUTA PARA ACTUALIZAR PERFIL DEL PSICÓLOGO
+        // Nueva ruta para actualizar perfil del psicólogo
         Route::put('perfil', [AuthController::class, 'updateProfile'])
             ->name('auth.updateProfile');
             
@@ -67,9 +69,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('catalogos.porGrupo');
     });
 
+    // Resumen General de Métricas (Dashboard)
+    Route::get('dashboard/resumen', [DashboardController::class, 'resumen'])
+        ->name('dashboard.resumen');
+
+    // NUEVA RUTA: Historial de Análisis NLP
+    Route::get('analisis/historial', [AnalisisController::class, 'index'])
+        ->name('analisis.index');
+
     // Próximas Citas (Agenda General)
     Route::get('sesiones/proximas', [SesionController::class, 'proximas'])
         ->name('sesiones.proximas');
+
+    // Cambiar estado de paciente (Activo/Inactivo)
+    Route::patch('pacientes/{paciente}/toggle-status', [PacienteController::class, 'toggleStatus'])
+        ->name('pacientes.toggleStatus');
 
     // Pacientes (CRUD completo)
     Route::apiResource('pacientes', PacienteController::class);
@@ -107,14 +121,5 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('nota', [NotaClinicaController::class, 'store'])
             ->name('nota.store');
     });
-
-    /*
-    | Los siguientes módulos se irán agregando aquí:
-    |
-    | Route::apiResource('catalogos',  CatalogoController::class);
-    | Route::apiResource('pacientes',  PacienteController::class);
-    | Route::apiResource('sesiones',   SesionController::class);
-    | Route::apiResource('notas',      NotaClinicaController::class);
-    */
 
 });

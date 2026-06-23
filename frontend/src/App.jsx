@@ -9,7 +9,8 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 import Login from './pages/auth/Login';
 import Dashboard from './pages/dashboard/Dashboard';
 import Pacientes from './pages/patients/Pacientes'; 
-import Agenda from './pages/agenda/Agenda'; // <-- Corregido con la "A" mayúscula
+import Agenda from './pages/agenda/Agenda';
+import AnalisisIA from './pages/analisis/AnalisisIA'; 
 
 function App() {
   return (
@@ -27,7 +28,7 @@ function App() {
               {/* <-- Reemplazamos el div estático por el componente real de FullCalendar --> */}
               <Route path="/agenda" element={<Agenda />} />
               
-              <Route path="/analisis-ia" element={<div className="p-8 font-bold">Análisis NLP...</div>} />
+              <Route path="/analisis-ia" element={<AnalisisIA />} />
               <Route path="/expedientes" element={<div className="p-8 font-bold">Expedientes...</div>} />
               <Route path="/reportes" element={<div className="p-8 font-bold">Reportes...</div>} />
             </Route>
