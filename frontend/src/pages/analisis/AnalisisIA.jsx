@@ -9,7 +9,6 @@ export default function AnalisisIA() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   
-  // NUEVO: Estados para manejar la paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [paginationInfo, setPaginationInfo] = useState({});
 
@@ -21,14 +20,10 @@ export default function AnalisisIA() {
         setIsLoading(true);
         setHasError(false);
         
-        // Se envía la página actual al backend
         const response = await api.get(`/analisis/historial?page=${currentPage}`);
         
         if (response.data && response.data.success) {
-          // Extraemos los datos del arreglo paginado de Laravel
           setAnalisisList(response.data.data.data); 
-          
-          // Guardamos la metadata de las páginas
           setPaginationInfo({
             current_page: response.data.data.current_page,
             last_page: response.data.data.last_page,
@@ -45,7 +40,7 @@ export default function AnalisisIA() {
       }
     };
     fetchAnalisis();
-  }, [currentPage]); // Se vuelve a ejecutar cuando cambia la página
+  }, [currentPage]);
 
   const getEstiloTarjeta = (estrellas) => {
     if (estrellas >= 4) return { border: 'border-emerald-200', bg: 'bg-emerald-50', text: 'text-emerald-700', badge: 'Positivo', iconBg: 'bg-emerald-100 text-emerald-600' };
@@ -53,7 +48,13 @@ export default function AnalisisIA() {
     return { border: 'border-amber-200', bg: 'bg-amber-50', text: 'text-amber-700', badge: 'Neutral', iconBg: 'bg-amber-100 text-amber-600' };
   };
 
-  // Loader inicial a pantalla completa (solo cuando no hay datos aún)
+  // NUEVO: Función para dar formato corto y amigable a la fecha
+  const formatShortDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString.split('T')[0] + 'T00:00:00');
+    return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   if (isLoading && analisisList.length === 0) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
@@ -97,7 +98,6 @@ export default function AnalisisIA() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
             
-            {/* Loader sutil al cambiar de página */}
             {isLoading && (
               <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-[2rem]">
                 <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -119,7 +119,8 @@ export default function AnalisisIA() {
                       </h4>
                       <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-1">
                         <Calendar className="w-3.5 h-3.5" /> 
-                        {sesion?.fecha_sesion || item.created_at.split('T')[0]}
+                        {/* AQUÍ APLICAMOS LA FECHA FORMATEADA */}
+                        {formatShortDate(sesion?.fecha_sesion || item.created_at)}
                       </p>
                     </div>
                     <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${estilos.bg} ${estilos.text}`}>
@@ -161,7 +162,6 @@ export default function AnalisisIA() {
         )}
       </div>
 
-      {/* NUEVO: Controles Visuales de Paginación */}
       {paginationInfo.last_page > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between bg-white px-6 py-4 border border-slate-100 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] gap-4">
           <p className="text-sm font-medium text-slate-500 text-center sm:text-left">

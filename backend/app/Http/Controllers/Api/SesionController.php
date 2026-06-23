@@ -46,25 +46,21 @@ class SesionController extends Controller
     public function index($pacienteId)
     {
         try {
-            // 1. Verificamos que el paciente exista y le pertenezca al psicólogo
             $paciente = \App\Models\Paciente::where('user_id', auth()->id())->findOrFail($pacienteId);
 
-            // 2. Buscamos las sesiones usando get() en lugar de firstOrFail()
-            // Si no hay sesiones, get() devuelve una colección vacía [], lo cual es lo correcto.
-            $sesiones = \App\Models\Sesion::with(['tipoSesion', 'estadoSesion', 'nota'])
+            // CORRECCIÓN: Usamos 'nota' (como tú lo tenías) y le anidamos el análisis
+            $sesiones = \App\Models\Sesion::with(['tipoSesion', 'estadoSesion', 'nota.analisisSentimiento'])
                 ->where('paciente_id', $paciente->id)
                 ->orderBy('fecha_sesion', 'desc')
                 ->orderBy('hora_inicio', 'desc')
                 ->get();
 
-            // 3. Devolvemos un 200 OK siempre, aunque el arreglo esté vacío
             return response()->json([
                 'success' => true,
                 'data' => $sesiones
             ], 200);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            // Este 404 SOLO debe saltar si el PACIENTE no existe o es de otro psicólogo
             return response()->json([
                 'success' => false, 
                 'message' => 'Paciente no encontrado o no tienes permisos'
@@ -73,7 +69,7 @@ class SesionController extends Controller
             return response()->json([
                 'success' => false, 
                 'message' => 'Error al cargar el historial de sesiones',
-                'error' => $e->getMessage()
+                'error_real' => $e->getMessage()
             ], 500);
         }
     }

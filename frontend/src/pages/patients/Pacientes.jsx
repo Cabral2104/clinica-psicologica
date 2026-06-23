@@ -12,7 +12,7 @@ export default function Pacientes() {
   const [isLoading, setIsLoading] = useState(true);
   
   const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [searchTerm, setSearchTerm] = useState(''); // <-- NUEVO: Estado para el texto de búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [expandedPatientId, setExpandedPatientId] = useState(null);
   const [patientSessions, setPatientSessions] = useState({});
@@ -73,7 +73,12 @@ export default function Pacientes() {
       const response = await api.get(`/pacientes/${patientId}/sesiones`);
       setPatientSessions(prev => ({ ...prev, [patientId]: extractArray(response) }));
     } catch (error) {
-      console.error(`Error al cargar sesiones del paciente ${patientId}:`, error);
+      if (error.response && error.response.status === 404) {
+        setPatientSessions(prev => ({ ...prev, [patientId]: [] }));
+      } else {
+        console.error(`Error al cargar sesiones del paciente ${patientId}:`, error);
+        setPatientSessions(prev => ({ ...prev, [patientId]: [] }));
+      }
     } finally {
       setLoadingSessions(prev => ({ ...prev, [patientId]: false }));
     }
@@ -130,15 +135,20 @@ export default function Pacientes() {
     return { text: 'Neutral', score: formattedScore, colorCls: 'bg-amber-50 text-amber-600 border-amber-100' };
   };
 
-  // NUEVO: Lógica combinada de Filtrado por Estado + Búsqueda por Texto
+  // NUEVO: Función para dar formato corto y amigable a la fecha
+  const formatShortDate = (dateString) => {
+    if (!dateString) return '';
+    // Concatenamos 'T00:00:00' para evitar que el navegador reste un día por la zona horaria
+    const date = new Date(dateString.split('T')[0] + 'T00:00:00');
+    return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   const filteredPatients = patients.filter(paciente => {
-    // 1. Filtro de Estado
     const matchesStatus = 
       filtroEstado === 'todos' ||
       (filtroEstado === 'activos' && (paciente.status === 1 || paciente.status === true)) ||
       (filtroEstado === 'inactivos' && (paciente.status === 0 || paciente.status === false));
 
-    // 2. Filtro de Búsqueda de Texto (Insensible a mayúsculas/minúsculas)
     const nombreCompleto = `${paciente.nombre} ${paciente.apellido_paterno} ${paciente.apellido_materno || ''}`.toLowerCase();
     const email = (paciente.email || '').toLowerCase();
     const query = searchTerm.toLowerCase();
@@ -186,7 +196,6 @@ export default function Pacientes() {
 
           <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            {/* NUEVO: Conectamos el input al estado searchTerm */}
             <input 
               type="text" 
               placeholder="Buscar paciente..." 
@@ -280,14 +289,18 @@ export default function Pacientes() {
                     ) : (
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {sesiones.map((sesion) => {
-                          const badge = getBadgeInfo(sesion.nota);
+                          // AQUÍ ASEGURAMOS QUE LEA LA NOTA COMO LA MANDA LARAVEL
+                          const notaActual = sesion.nota;
+                          const badge = getBadgeInfo(notaActual);
+                          
                           return (
                             <div key={sesion.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group flex flex-col justify-between h-full">
                                <div>
                                  <div className="flex justify-between items-start mb-4">
                                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                      <Calendar className="w-4 h-4 text-slate-400" />
-                                     {sesion.fecha_sesion || sesion.created_at?.split('T')[0]}
+                                     {/* AQUÍ APLICAMOS LA FECHA FORMATEADA */}
+                                     {formatShortDate(sesion.fecha_sesion || sesion.created_at)}
                                    </div>
                                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
                                      Sesión #{sesion.numero_sesion}
@@ -308,7 +321,7 @@ export default function Pacientes() {
                                </div>
 
                                <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
-                                  {sesion.nota ? (
+                                  {notaActual ? (
                                       <div className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border ${badge.colorCls}`}>
                                         <Activity className="w-3.5 h-3.5" />
                                         <span>{badge.text}</span>
@@ -317,8 +330,8 @@ export default function Pacientes() {
                                   ) : (
                                     <div className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 border border-slate-200">Pendiente de Nota</div>
                                   )}
-                                  <button onClick={() => handleOpenNota(sesion.id, paciente.id, sesion.nota)} className="text-sm font-bold text-teal-600 hover:text-teal-700 transition-colors">
-                                    {sesion.nota ? 'Ver Nota' : 'Redactar Nota'}
+                                  <button onClick={() => handleOpenNota(sesion.id, paciente.id, notaActual)} className="text-sm font-bold text-teal-600 hover:text-teal-700 transition-colors">
+                                    {notaActual ? 'Ver Nota' : 'Redactar Nota'}
                                   </button>
                                </div>
                             </div>
