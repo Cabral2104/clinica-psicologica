@@ -124,16 +124,22 @@ export default function Pacientes() {
     if (selectedPacienteIdForSesion) fetchSesionesPaciente(selectedPacienteIdForSesion);
   };
 
-  const getBadgeInfo = (nota) => {
-    if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500 border-slate-200' };
-    const analisis = nota.analisis_sentimiento || nota.analisisSentimiento;
-    if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400 border-slate-200' };
-    const stars = analisis.estrellas;
-    const formattedScore = analisis.score ? `${(analisis.score * 100).toFixed(1)}%` : null;
-    if (stars >= 4) return { text: 'Positiva', score: formattedScore, colorCls: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
-    if (stars <= 2) return { text: 'Negativa', score: formattedScore, colorCls: 'bg-rose-50 text-rose-600 border-rose-100' };
-    return { text: 'Neutral', score: formattedScore, colorCls: 'bg-amber-50 text-amber-600 border-amber-100' };
-  };
+ const getBadgeInfo = (nota) => {
+  // Si no hay nota, no hay análisis
+  if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500' };
+  
+  // Accedemos a la relación 'analisis_sentimiento' que definimos en el controlador
+  const analisis = nota.analisis_sentimiento;
+  
+  if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400' };
+  
+  const score = analisis.score ? (analisis.score * 100).toFixed(0) + '%' : '';
+  
+  // Lógica de colores según el sentimiento
+  if (analisis.estrellas >= 4) return { text: 'POSITIVA', score, colorCls: 'bg-emerald-50 text-emerald-600' };
+  if (analisis.estrellas <= 2) return { text: 'NEGATIVA', score, colorCls: 'bg-rose-50 text-rose-600' };
+  return { text: 'NEUTRAL', score, colorCls: 'bg-amber-50 text-amber-600' };
+};
 
   // NUEVO: Función para dar formato corto y amigable a la fecha
   const formatShortDate = (dateString) => {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 use App\Http\Requests\NotaClinica\StoreNotaRequest;
 use App\Http\Resources\NotaClinicaResource;
 use App\Models\NotaClinica;
@@ -83,40 +84,53 @@ class NotaClinicaController extends Controller
      *
      * POST /api/v1/sesiones/{sesion}/nota
      */
-    public function store(StoreNotaRequest $request, int $sesionId): JsonResponse
+    public function store(Request $request, $sesionId)
     {
-        $sesion = $this->obtenerSesion($sesionId);
+        try {
+            $sesion = \App\Models\Sesion::findOrFail($sesionId);
 
-        if (! $sesion) {
-            return response()->json(['message' => 'Sesión no encontrada.'], 404);
+            // 1. Guardar o actualizar la Nota Clínica
+            $nota = \App\Models\NotaClinica::updateOrCreate(
+                ['sesion_id' => $sesion->id],
+                [
+                    'contenido' => $request->contenido,
+                    'subjetivo' => $request->subjetivo,
+                    'objetivo' => $request->objetivo,
+                    'analisis' => $request->analisis,
+                    'plan' => $request->plan,
+                    'tecnicas_utilizadas' => $request->tecnicas,
+                    'tareas_asignadas' => $request->tareas,
+                    'observaciones_privadas' => $request->observaciones,
+                ]
+            );
+
+            // 2. Guardar el Diagnóstico (si existe)
+            if ($request->has('diagnostico_seleccionado') && !empty($request->diagnostico_seleccionado)) {
+                $diagData = $request->diagnostico_seleccionado;
+                \App\Models\Diagnostico::create([
+                    'paciente_id' => $sesion->paciente_id,
+                    'user_id' => auth()->id(),
+                    'codigo_cie' => $diagData['codigo'],
+                    'nombre_diagnostico' => $diagData['descripcion'],
+                    'descripcion' => 'Diagnosticado durante la sesión #' . $sesion->numero_sesion,
+                    'fecha_diagnostico' => now()->format('Y-m-d'),
+                    'es_principal' => false,
+                    'status' => true
+                ]);
+            }
+
+            // 3. Ejecutar Análisis IA (NLP) de forma independiente
+            // Esto asegura que si el análisis falla, la nota ya se guardó y el diagnóstico también
+            try {
+                $this->nlpService->analizar($nota);
+            } catch (\Exception $nlpError) {
+                \Illuminate\Support\Facades\Log::error("El análisis IA falló, pero la nota se guardó: " . $nlpError->getMessage());
+            }
+            
+            return response()->json(['success' => true, 'data' => $nota], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-
-        // Paso 1: Guardar o actualizar la nota (upsert)
-        $nota = NotaClinica::updateOrCreate(
-            ['sesion_id' => $sesionId],
-            [
-                ...$request->validated(),
-                'status' => true,
-            ]
-        );
-
-        $esNueva = $nota->wasRecentlyCreated;
-
-        // Paso 2: Enviar al NLP para análisis (no bloqueante)
-        // Si falla, el error queda en el log pero la nota está guardada
-        $this->nlpService->analizar($nota);
-
-        // Paso 3: Recargar la nota con el análisis recién guardado
-        $nota->load(['analisisSentimiento', 'creador']);
-
-        return response()->json([
-            'message' => $esNueva
-                ? 'Nota clínica registrada correctamente.'
-                : 'Nota clínica actualizada correctamente.',
-            'data'    => new NotaClinicaResource($nota),
-            'nlp'     => $nota->analisisSentimiento
-                ? 'Análisis de sentimiento completado.'
-                : 'Análisis de sentimiento no disponible en este momento.',
-        ], $esNueva ? 201 : 200);
     }
 }

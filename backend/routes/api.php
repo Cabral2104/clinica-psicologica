@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\SesionController;
 use App\Http\Controllers\Api\NotaClinicaController;
 use App\Http\Controllers\Api\DiagnosticoController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\AnalisisController; // <-- NUEVA IMPORTACIÓN
+use App\Http\Controllers\Api\AnalisisController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -67,6 +67,10 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
             ->name('catalogos.index');
         Route::get('{grupo}',   [CatalogoController::class, 'porGrupo'])
             ->name('catalogos.porGrupo');
+        Route::get('cie10/buscar', [CatalogoController::class, 'buscarCie10'])->name('catalogos.cie10.buscar');
+        
+        Route::get('/', [CatalogoController::class, 'index'])->name('catalogos.index');
+        Route::get('{grupo}', [CatalogoController::class, 'porGrupo'])->name('catalogos.porGrupo');
     });
 
     // Resumen General de Métricas (Dashboard)
@@ -80,6 +84,14 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Próximas Citas (Agenda General)
     Route::get('sesiones/proximas', [SesionController::class, 'proximas'])
         ->name('sesiones.proximas');
+
+    // Cambiar estado de paciente (Activo/Inactivo)
+    Route::patch('pacientes/{paciente}/toggle-status', [PacienteController::class, 'toggleStatus'])
+        ->name('pacientes.toggleStatus');
+
+    // Obtener Expediente Clínico Completo
+    Route::get('pacientes/{paciente}/expediente', [PacienteController::class, 'showExpediente'])
+        ->name('pacientes.expediente');
 
     // Cambiar estado de paciente (Activo/Inactivo)
     Route::patch('pacientes/{paciente}/toggle-status', [PacienteController::class, 'toggleStatus'])
