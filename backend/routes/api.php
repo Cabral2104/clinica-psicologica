@@ -93,6 +93,9 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('pacientes/{paciente}/expediente', [PacienteController::class, 'showExpediente'])
         ->name('pacientes.expediente');
 
+    Route::get('pacientes/{id}/exportar-pdf', [\App\Http\Controllers\Api\PacienteController::class, 'exportarPdf'])
+        ->name('pacientes.exportarPdf');
+
     // Cambiar estado de paciente (Activo/Inactivo)
     Route::patch('pacientes/{paciente}/toggle-status', [PacienteController::class, 'toggleStatus'])
         ->name('pacientes.toggleStatus');

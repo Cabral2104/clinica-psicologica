@@ -10,6 +10,7 @@ use App\Models\Paciente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 /**
  * PacienteController
@@ -237,6 +238,30 @@ class PacienteController extends Controller
                 'success' => false, 
                 'message' => 'Error SQL: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function exportarPdf($id)
+    {
+        try {
+            $paciente = \App\Models\Paciente::with([
+                'genero',
+                'contactosEmergencia',
+                'diagnosticos' => function($q) { $q->orderBy('fecha_diagnostico', 'desc'); },
+                'sesiones' => function($q) { $q->orderBy('fecha_sesion', 'asc'); },
+                'sesiones.nota.analisisSentimiento'
+            ])
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
+
+            // Cargamos una vista HTML (que crearemos en el siguiente paso) y le pasamos los datos
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.expediente', compact('paciente'));
+            
+            // Retornamos el archivo PDF para descarga
+            return $pdf->download('Expediente_' . $paciente->id . '.pdf');
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error al generar PDF: ' . $e->getMessage()], 500);
         }
     }
 }

@@ -1,4 +1,3 @@
-// Archivo: src/pages/expedientes/Expedientes.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Search, FileText, Phone, Activity, Calendar, 
@@ -20,6 +19,9 @@ export default function Expedientes() {
   const [isLoadingExpediente, setIsLoadingExpediente] = useState(false);
   const [errorExpediente, setErrorExpediente] = useState(false); 
   const [activeTab, setActiveTab] = useState('general');
+  
+  // NUEVO ESTADO: Controla el indicador de carga del botón PDF
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -95,6 +97,33 @@ export default function Expedientes() {
         edad--;
     }
     return edad;
+  };
+
+  // NUEVA FUNCIÓN: Maneja la petición y descarga del PDF
+  const handleExportPDF = async () => {
+    if (!selectedPatientId || !expediente) return;
+    
+    setIsExporting(true);
+    try {
+      const response = await api.get(`/pacientes/${selectedPatientId}/exportar-pdf`, {
+        responseType: 'blob', // Crítico para manejar archivos binarios
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Expediente_${expediente.nombre.replace(/\s+/g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error al exportar PDF:", error);
+      alert("Hubo un problema al generar el PDF.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const contactoPrincipal = expediente?.contactos_emergencia?.length > 0 
@@ -214,8 +243,14 @@ export default function Expedientes() {
                 </div>
               </div>
 
-              <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-xl transition-colors shadow-sm shrink-0">
-                <Download className="w-4 h-4" /> Exportar PDF
+              {/* BOTÓN ACTUALIZADO PARA EXPORTAR PDF */}
+              <button 
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold rounded-xl transition-colors shadow-sm shrink-0 disabled:opacity-70"
+              >
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {isExporting ? 'Generando...' : 'Exportar PDF'}
               </button>
             </div>
 
@@ -290,7 +325,7 @@ export default function Expedientes() {
                           </div>
                           <div>
                             <div className="flex items-center gap-3">
-                              <h4 className="font-bold text-slate-800">{diag.cie10_codigo} - {diag.titulo}</h4>
+                              <h4 className="font-bold text-slate-800">{diag.codigo_cie} - {diag.nombre_diagnostico}</h4>
                               {diag.status ? 
                                 <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-md">Activo</span> :
                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded-md">Resuelto</span>
