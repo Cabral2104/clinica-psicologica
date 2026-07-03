@@ -190,11 +190,23 @@ class PacienteController extends Controller
         ], 200);
     }
 
-    public function toggleStatus($id)
+    /**
+     * Alternar y configurar estados de paciente utilizando el catálogo.
+     */
+    public function toggleStatus(\Illuminate\Http\Request $request, $id)
     {
         try {
+            // Validamos que nos manden el ID del catálogo (5=Activo, 6=Alta Terapéutica, 7=Baja/Inactivo)
+            $request->validate([
+                'estado_paciente_id' => 'required|integer|in:5,6,7'
+            ]);
+
             $paciente = \App\Models\Paciente::where('user_id', auth()->id())->findOrFail($id);
-            $paciente->status = !$paciente->status;
+            
+            $paciente->estado_paciente_id = $request->estado_paciente_id;
+            // Si es baja (7), marcamos el booleano 'status' en false, si no, true
+            $paciente->status = ($request->estado_paciente_id == 7) ? false : true; 
+            
             $paciente->save();
 
             return response()->json([

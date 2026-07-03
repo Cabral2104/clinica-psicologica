@@ -20,7 +20,6 @@ export default function Expedientes() {
   const [errorExpediente, setErrorExpediente] = useState(false); 
   const [activeTab, setActiveTab] = useState('general');
   
-  // NUEVO ESTADO: Controla el indicador de carga del botón PDF
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -99,14 +98,13 @@ export default function Expedientes() {
     return edad;
   };
 
-  // NUEVA FUNCIÓN: Maneja la petición y descarga del PDF
   const handleExportPDF = async () => {
     if (!selectedPatientId || !expediente) return;
     
     setIsExporting(true);
     try {
       const response = await api.get(`/pacientes/${selectedPatientId}/exportar-pdf`, {
-        responseType: 'blob', // Crítico para manejar archivos binarios
+        responseType: 'blob', 
       });
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -123,6 +121,35 @@ export default function Expedientes() {
       alert("Hubo un problema al generar el PDF.");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  // Función exclusiva para Diagnósticos (con validación de campos obligatorios para evitar 422)
+  const toggleStatusDiagnostico = async (diagnostico) => {
+    console.log("Intentando actualizar diagnóstico ID:", diagnostico.id); // <--- REVISA ESTO EN CONSOLA
+    try {
+      const nuevoStatus = !diagnostico.status; 
+      
+      // Asegúrate de que esta URL coincida con la ruta definida en api.php
+      const response = await api.put(`/pacientes/${expediente.id}/diagnosticos/${diagnostico.id}`, {
+        codigo_cie: diagnostico.codigo_cie,
+        nombre_diagnostico: diagnostico.nombre_diagnostico,
+        descripcion: diagnostico.descripcion || '',
+        status: nuevoStatus
+      });
+
+      if (response.status === 200) {
+        setExpediente({
+          ...expediente,
+          diagnosticos: expediente.diagnosticos.map(d => 
+            d.id === diagnostico.id ? { ...d, status: nuevoStatus } : d
+          )
+        });
+        console.log("Diagnóstico actualizado con éxito");
+      }
+    } catch (error) {
+      console.error("Error al actualizar el estado del diagnóstico:", error);
+      alert("Hubo un error al actualizar. Revisa la consola.");
     }
   };
 
@@ -243,7 +270,6 @@ export default function Expedientes() {
                 </div>
               </div>
 
-              {/* BOTÓN ACTUALIZADO PARA EXPORTAR PDF */}
               <button 
                 onClick={handleExportPDF}
                 disabled={isExporting}
@@ -326,10 +352,18 @@ export default function Expedientes() {
                           <div>
                             <div className="flex items-center gap-3">
                               <h4 className="font-bold text-slate-800">{diag.codigo_cie} - {diag.nombre_diagnostico}</h4>
-                              {diag.status ? 
-                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-md">Activo</span> :
-                                <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded-md">Resuelto</span>
-                              }
+                              
+                              <button
+                                onClick={() => toggleStatusDiagnostico(diag)}
+                                className={`text-[10px] font-bold px-2.5 py-1 rounded-md cursor-pointer transition-colors shadow-sm ${
+                                  diag.status 
+                                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-200' 
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200'
+                                }`}
+                                title="Clic para cambiar el estado"
+                              >
+                                {diag.status ? 'ACTIVO' : 'RESUELTO'}
+                              </button>
                             </div>
                             <p className="text-sm text-slate-600 mt-2">{diag.descripcion}</p>
                             <p className="text-xs font-bold text-slate-400 mt-3 flex items-center gap-1.5">
@@ -361,8 +395,12 @@ export default function Expedientes() {
                             
                             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                               <div className="flex flex-wrap justify-between items-start mb-3 gap-2">
-                                <div>
-                                  <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md mb-2 inline-block">Sesión #{sesion.numero_sesion}</span>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2 py-1 rounded-md inline-block">
+                                      Sesión #{sesion.numero_sesion}
+                                    </span>
+                                  </div>
                                   <h4 className="font-bold text-slate-800">{formatShortDate(sesion.fecha_sesion)}</h4>
                                 </div>
                                 {nlp && (
