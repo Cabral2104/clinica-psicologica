@@ -11,6 +11,7 @@ import Pacientes from './pages/patients/Pacientes';
 import Agenda from './pages/agenda/Agenda';
 import AnalisisIA from './pages/analisis/AnalisisIA'; 
 import Expedientes from './pages/expedientes/Expedientes'; 
+import Reportes from './pages/reportes/Reportes';
 
 function App() {
   return (
@@ -30,7 +31,7 @@ function App() {
               {/* <-- Reemplazamos el div estático por el componente real de Expedientes --> */}
               <Route path="/expedientes" element={<Expedientes />} />
               
-              <Route path="/reportes" element={<div className="p-8 font-bold">Reportes...</div>} />
+              <Route path="/reportes" element={<Reportes />} />
             </Route>
           </Route>
 

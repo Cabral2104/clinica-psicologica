@@ -1,3 +1,14 @@
+/* --- FIX PARA EXPORTACIÓN PDF --- */
+:root {
+  --fallback-color: #64748b;
+}
+
+* {
+  /* Forzamos el uso de sRGB para que librerías como html2canvas no se confundan */
+  color-interpolation-filters: sRGB;
+}
+/* ---------------------------------- */
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
