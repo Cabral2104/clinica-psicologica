@@ -1,14 +1,17 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+
+// Controladores
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CatalogoController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\PacienteController;
 use App\Http\Controllers\Api\SesionController;
 use App\Http\Controllers\Api\NotaClinicaController;
 use App\Http\Controllers\Api\DiagnosticoController;
 use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\AnalisisController; // <-- NUEVA IMPORTACIÓN
+use App\Http\Controllers\Api\AnalisisController; 
+use App\Http\Controllers\Api\ReporteController; 
 
 /*
 |--------------------------------------------------------------------------
@@ -63,17 +66,36 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     // Catálogos (solo lectura)
     Route::prefix('catalogos')->group(function () {
-        Route::get('/',         [CatalogoController::class, 'index'])
+        Route::get('cie10/buscar', [CatalogoController::class, 'buscarCie10'])
+            ->name('catalogos.cie10.buscar');
+        Route::get('/', [CatalogoController::class, 'index'])
             ->name('catalogos.index');
         Route::get('{grupo}',   [CatalogoController::class, 'porGrupo'])
             ->name('catalogos.porGrupo');
     });
 
-    // Resumen General de Métricas (Dashboard)
+    // Resumen General de Métricas (Dashboard Antiguo/Actual)
     Route::get('dashboard/resumen', [DashboardController::class, 'resumen'])
         ->name('dashboard.resumen');
 
-    // NUEVA RUTA: Historial de Análisis NLP
+    // ==========================================
+    // MÓDULO DE REPORTES Y DASHBOARD
+    // ==========================================
+    Route::get('reportes/dashboard', [ReporteController::class, 'dashboardStats'])
+        ->name('reportes.dashboard');
+    
+    Route::get('reportes/pacientes-recientes', [ReporteController::class, 'pacientesRecientes'])
+        ->name('reportes.pacientesRecientes');
+
+    // NUEVA RUTA: Exportar PDF del Dashboard desde el servidor
+    Route::get('reportes/exportar-pdf', [ReporteController::class, 'exportarReportePdf'])
+        ->name('reportes.exportarPdf');
+
+    Route::get('reportes/pacientes-todos', [ReporteController::class, 'todosLosPacientes'])
+        ->name('reportes.pacientesTodos');
+    // ==========================================
+
+    // Historial de Análisis NLP
     Route::get('analisis/historial', [AnalisisController::class, 'index'])
         ->name('analisis.index');
 
@@ -85,11 +107,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::patch('pacientes/{paciente}/toggle-status', [PacienteController::class, 'toggleStatus'])
         ->name('pacientes.toggleStatus');
 
+    // Obtener Expediente Clínico Completo
+    Route::get('pacientes/{paciente}/expediente', [PacienteController::class, 'showExpediente'])
+        ->name('pacientes.expediente');
+
+    // Exportar Expediente a PDF
+    Route::get('pacientes/{id}/exportar-pdf', [PacienteController::class, 'exportarPdf'])
+        ->name('pacientes.exportarPdf');
+
     // Pacientes (CRUD completo)
     Route::apiResource('pacientes', PacienteController::class);
 
-    // Sesiones anidadas bajo paciente
+    // Sesiones y Diagnósticos anidados bajo paciente
     Route::prefix('pacientes/{paciente}')->group(function () {
+        
+        // Sesiones
         Route::get('sesiones',              [SesionController::class, 'index'])
             ->name('sesiones.index');
         Route::post('sesiones',             [SesionController::class, 'store'])

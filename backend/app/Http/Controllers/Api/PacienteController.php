@@ -10,6 +10,7 @@ use App\Models\Paciente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 /**
  * PacienteController
@@ -33,24 +34,39 @@ class PacienteController extends Controller
      *
      * GET /api/v1/pacientes
      */
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
         try {
-            // 1. Usamos la ruta absoluta \App\Models\Paciente para evitar errores si falta el "use" arriba
-            $pacientes = \App\Models\Paciente::where('user_id', auth()->id())
-                                 ->orderBy('created_at', 'desc')
-                                 ->get();
+            $query = \App\Models\Paciente::where('user_id', auth()->id());
 
-            // 2. Restauramos el uso de tu Resource para que Laravel parsee los datos correctamente
+            // 1. Buscador Real (Backend Search)
+            if ($request->has('search') && !empty($request->search)) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('nombre', 'LIKE', "%{$search}%")
+                      ->orWhere('apellido_paterno', 'LIKE', "%{$search}%")
+                      ->orWhere('apellido_materno', 'LIKE', "%{$search}%")
+                      ->orWhere('email', 'LIKE', "%{$search}%");
+                });
+            }
+
+            // 2. Paginación Inteligente
+            // Si el frontend manda "?page=X", paginamos de 8 en 8. 
+            // Si no (como en tu vista anterior de Pacientes), devuelve todos.
+            if ($request->has('page')) {
+                $pacientes = $query->orderBy('created_at', 'desc')->paginate(8);
+            } else {
+                $pacientes = $query->orderBy('created_at', 'desc')->get();
+            }
+
+            // Usamos tu Resource para mantener el formato limpio
             return \App\Http\Resources\PacienteResource::collection($pacientes);
 
         } catch (\Exception $e) {
-            // Si Laravel falla, ya no mandará un 500 en blanco, nos dirá la línea y el motivo exacto
             return response()->json([
-                'success' => false,
-                'message' => 'Error al cargar pacientes',
-                'error_real' => $e->getMessage(),
-                'linea' => $e->getLine()
+                'success' => false, 
+                'message' => 'Error al cargar pacientes', 
+                'error_real' => $e->getMessage()
             ], 500);
         }
     }
@@ -174,11 +190,23 @@ class PacienteController extends Controller
         ], 200);
     }
 
-    public function toggleStatus($id)
+    /**
+     * Alternar y configurar estados de paciente utilizando el catálogo.
+     */
+    public function toggleStatus(\Illuminate\Http\Request $request, $id)
     {
         try {
+            // Validamos que nos manden el ID del catálogo (5=Activo, 6=Alta Terapéutica, 7=Baja/Inactivo)
+            $request->validate([
+                'estado_paciente_id' => 'required|integer|in:5,6,7'
+            ]);
+
             $paciente = \App\Models\Paciente::where('user_id', auth()->id())->findOrFail($id);
-            $paciente->status = !$paciente->status;
+            
+            $paciente->estado_paciente_id = $request->estado_paciente_id;
+            // Si es baja (7), marcamos el booleano 'status' en false, si no, true
+            $paciente->status = ($request->estado_paciente_id == 7) ? false : true; 
+            
             $paciente->save();
 
             return response()->json([
@@ -192,6 +220,60 @@ class PacienteController extends Controller
                 'message' => 'Error al cambiar estado',
                 'error_real' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function showExpediente($id)
+    {
+        try {
+            $paciente = \App\Models\Paciente::with([
+                'genero',               // <-- Agregamos el catálogo de género
+                'contactosEmergencia', 
+                'diagnosticos',
+                'sesiones' => function($query) {
+                    $query->orderBy('fecha_sesion', 'desc');
+                },
+                'sesiones.tipoSesion',
+                'sesiones.estadoSesion',
+                'sesiones.nota.analisisSentimiento'
+            ])
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'data' => $paciente
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Error SQL: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function exportarPdf($id)
+    {
+        try {
+            $paciente = \App\Models\Paciente::with([
+                'genero',
+                'contactosEmergencia',
+                'diagnosticos' => function($q) { $q->orderBy('fecha_diagnostico', 'desc'); },
+                'sesiones' => function($q) { $q->orderBy('fecha_sesion', 'asc'); },
+                'sesiones.nota.analisisSentimiento'
+            ])
+            ->where('user_id', auth()->id())
+            ->findOrFail($id);
+
+            // Cargamos una vista HTML (que crearemos en el siguiente paso) y le pasamos los datos
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.expediente', compact('paciente'));
+            
+            // Retornamos el archivo PDF para descarga
+            return $pdf->download('Expediente_' . $paciente->id . '.pdf');
+
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error al generar PDF: ' . $e->getMessage()], 500);
         }
     }
 }

@@ -46,31 +46,21 @@ class SesionController extends Controller
     public function index($pacienteId)
     {
         try {
+            // Obtenemos al paciente primero
             $paciente = \App\Models\Paciente::where('user_id', auth()->id())->findOrFail($pacienteId);
 
-            // CORRECCIÓN: Usamos 'nota' (como tú lo tenías) y le anidamos el análisis
-            $sesiones = \App\Models\Sesion::with(['tipoSesion', 'estadoSesion', 'nota.analisisSentimiento'])
+            // Usamos una carga de relaciones más segura
+            // Nota: Asegúrate de que en tu modelo Sesion.php exista public function nota() { ... }
+            $sesiones = \App\Models\Sesion::with(['nota', 'nota.analisisSentimiento'])
                 ->where('paciente_id', $paciente->id)
                 ->orderBy('fecha_sesion', 'desc')
-                ->orderBy('hora_inicio', 'desc')
                 ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $sesiones
-            ], 200);
+            return response()->json(['success' => true, 'data' => $sesiones], 200);
 
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Paciente no encontrado o no tienes permisos'
-            ], 404);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Error al cargar el historial de sesiones',
-                'error_real' => $e->getMessage()
-            ], 500);
+            \Illuminate\Support\Facades\Log::error("Error sesiones: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 

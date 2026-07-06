@@ -84,4 +84,30 @@ class CatalogoController extends Controller
             'data' => $catalogos,
         ], 200);
     }
+
+    public function buscarCie10(\Illuminate\Http\Request $request)
+    {
+        try {
+            $search = $request->query('q');
+
+            if (empty($search) || strlen($search) < 2) {
+                return response()->json([]);
+            }
+
+            $resultados = \Illuminate\Support\Facades\DB::table('catalogo_cie10')
+                ->where('activo', true)
+                ->where(function($query) use ($search) {
+                    $query->where('codigo', 'LIKE', "%{$search}%")
+                          ->orWhere('descripcion', 'LIKE', "%{$search}%");
+                })
+                ->select('id', 'codigo', 'descripcion')
+                ->limit(10)
+                ->get();
+
+            return response()->json($resultados);
+
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

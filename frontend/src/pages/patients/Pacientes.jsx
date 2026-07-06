@@ -1,7 +1,7 @@
 // Archivo: src/pages/patients/Pacientes.jsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom'; 
-import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, Loader2, FileText, Clock, Edit, Power, Filter } from 'lucide-react';
+import { Users, Search, Calendar, Activity, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Loader2, FileText, Clock, Edit, Filter } from 'lucide-react';
 import api from '../../services/api';
 import NuevaSesionSlideover from '../../components/patients/NuevaSesionSlideover';
 import RedactarNotaSlideover from '../../components/patients/RedactarNotaSlideover'; 
@@ -13,6 +13,12 @@ export default function Pacientes() {
   
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // ESTADOS DE PAGINACIÓN FRONTEND
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sessionPages, setSessionPages] = useState({}); // { pacienteId: paginaActual }
+  const itemsPerPage = 8;
+  const sessionsPerPage = 3;
 
   const [expandedPatientId, setExpandedPatientId] = useState(null);
   const [patientSessions, setPatientSessions] = useState({});
@@ -67,11 +73,18 @@ export default function Pacientes() {
     initializePage();
   }, [location]);
 
+  // Si cambia el filtro o la búsqueda, regresamos a la página 1
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtroEstado, searchTerm]);
+
   const fetchSesionesPaciente = async (patientId) => {
     try {
       setLoadingSessions(prev => ({ ...prev, [patientId]: true }));
       const response = await api.get(`/pacientes/${patientId}/sesiones`);
       setPatientSessions(prev => ({ ...prev, [patientId]: extractArray(response) }));
+      // Reiniciamos la paginación de sesiones para este paciente
+      setSessionPages(prev => ({ ...prev, [patientId]: 1 }));
     } catch (error) {
       if (error.response && error.response.status === 404) {
         setPatientSessions(prev => ({ ...prev, [patientId]: [] }));
@@ -93,12 +106,18 @@ export default function Pacientes() {
     if (!patientSessions[patientId]) fetchSesionesPaciente(patientId);
   };
 
-  const handleToggleStatus = async (pacienteId) => {
+  const handleChangeEstadoPaciente = async (pacienteId, nuevoEstadoId) => {
+    setPatients(prev => prev.map(p => 
+      p.id === pacienteId ? { ...p, estado_paciente_id: parseInt(nuevoEstadoId) } : p
+    ));
+
     try {
-      await api.patch(`/pacientes/${pacienteId}/toggle-status`);
-      fetchPatients(false); 
+      await api.patch(`/pacientes/${pacienteId}/toggle-status`, {
+        estado_paciente_id: parseInt(nuevoEstadoId)
+      });
     } catch (error) {
       console.error("Error al cambiar el estado del paciente", error);
+      fetchPatients(false); 
     }
   };
 
@@ -124,39 +143,76 @@ export default function Pacientes() {
     if (selectedPacienteIdForSesion) fetchSesionesPaciente(selectedPacienteIdForSesion);
   };
 
-  const getBadgeInfo = (nota) => {
-    if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500 border-slate-200' };
-    const analisis = nota.analisis_sentimiento || nota.analisisSentimiento;
-    if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400 border-slate-200' };
-    const stars = analisis.estrellas;
-    const formattedScore = analisis.score ? `${(analisis.score * 100).toFixed(1)}%` : null;
-    if (stars >= 4) return { text: 'Positiva', score: formattedScore, colorCls: 'bg-emerald-50 text-emerald-600 border-emerald-100' };
-    if (stars <= 2) return { text: 'Negativa', score: formattedScore, colorCls: 'bg-rose-50 text-rose-600 border-rose-100' };
-    return { text: 'Neutral', score: formattedScore, colorCls: 'bg-amber-50 text-amber-600 border-amber-100' };
+  const actualizarEstadoSesion = async (pacienteId, sesionId, nuevoEstadoId) => {
+    const sesionesActuales = patientSessions[pacienteId];
+    const sesionActual = sesionesActuales.find(s => s.id === sesionId);
+    if (!sesionActual) return;
+
+    setPatientSessions(prev => ({
+      ...prev,
+      [pacienteId]: prev[pacienteId].map(s => 
+        s.id === sesionId ? { ...s, estado_sesion_id: parseInt(nuevoEstadoId) } : s
+      )
+    }));
+
+    try {
+      const payload = { ...sesionActual, estado_sesion_id: parseInt(nuevoEstadoId) };
+      if (payload.hora_inicio && payload.hora_inicio.length > 5) payload.hora_inicio = payload.hora_inicio.substring(0, 5);
+      if (payload.hora_fin && payload.hora_fin.length > 5) payload.hora_fin = payload.hora_fin.substring(0, 5);
+
+      await api.put(`/pacientes/${pacienteId}/sesiones/${sesionId}`, payload);
+    } catch (error) {
+      console.error("Error al actualizar la sesión:", error);
+      fetchSesionesPaciente(pacienteId);
+    }
   };
 
-  // NUEVO: Función para dar formato corto y amigable a la fecha
+  const handleSessionPageChange = (patientId, direction) => {
+    setSessionPages(prev => {
+      const current = prev[patientId] || 1;
+      return { ...prev, [patientId]: current + direction };
+    });
+  };
+
+  const getBadgeInfo = (nota) => {
+    if (!nota) return { text: 'Sin Nota', score: null, colorCls: 'bg-slate-100 text-slate-500' };
+    
+    const analisis = nota.analisis_sentimiento;
+    if (!analisis) return { text: 'Sin Análisis', score: null, colorCls: 'bg-slate-100 text-slate-400' };
+    
+    const score = analisis.score ? (analisis.score * 100).toFixed(0) + '%' : '';
+    
+    if (analisis.estrellas >= 4) return { text: 'POSITIVA', score, colorCls: 'bg-emerald-50 text-emerald-600' };
+    if (analisis.estrellas <= 2) return { text: 'NEGATIVA', score, colorCls: 'bg-rose-50 text-rose-600' };
+    return { text: 'NEUTRAL', score, colorCls: 'bg-amber-50 text-amber-600' };
+  };
+
   const formatShortDate = (dateString) => {
     if (!dateString) return '';
-    // Concatenamos 'T00:00:00' para evitar que el navegador reste un día por la zona horaria
     const date = new Date(dateString.split('T')[0] + 'T00:00:00');
     return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  // 1. APLICAR FILTROS
   const filteredPatients = patients.filter(paciente => {
+    const estadoId = paciente.estado_paciente_id || (paciente.status ? 5 : 7);
     const matchesStatus = 
       filtroEstado === 'todos' ||
-      (filtroEstado === 'activos' && (paciente.status === 1 || paciente.status === true)) ||
-      (filtroEstado === 'inactivos' && (paciente.status === 0 || paciente.status === false));
+      (filtroEstado === 'activos' && estadoId === 5) ||
+      (filtroEstado === 'altas' && estadoId === 6) ||
+      (filtroEstado === 'inactivos' && estadoId === 7);
 
     const nombreCompleto = `${paciente.nombre} ${paciente.apellido_paterno} ${paciente.apellido_materno || ''}`.toLowerCase();
     const email = (paciente.email || '').toLowerCase();
     const query = searchTerm.toLowerCase();
-    
     const matchesSearch = nombreCompleto.includes(query) || email.includes(query);
 
     return matchesStatus && matchesSearch;
   });
+
+  // 2. APLICAR PAGINACIÓN DE LA LISTA PRINCIPAL
+  const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
+  const paginatedPatients = filteredPatients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (isLoading) {
     return (
@@ -168,7 +224,9 @@ export default function Pacientes() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 relative">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 relative pb-10">
+      
+      {/* ENCABEZADO Y FILTROS */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <div className="flex items-center gap-4">
           <div className="p-4 bg-blue-50 rounded-2xl text-blue-500">
@@ -181,16 +239,17 @@ export default function Pacientes() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-          <div className="relative w-full sm:w-40">
+          <div className="relative w-full sm:w-48">
             <Filter className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <select 
               value={filtroEstado}
               onChange={(e) => setFiltroEstado(e.target.value)}
               className="w-full pl-11 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:border-teal-500 outline-none transition-all text-slate-700 appearance-none"
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Todos los Estados</option>
               <option value="activos">Activos</option>
-              <option value="inactivos">Inactivos</option>
+              <option value="altas">Alta Terapéutica</option>
+              <option value="inactivos">Baja / Inactivos</option>
             </select>
           </div>
 
@@ -207,32 +266,39 @@ export default function Pacientes() {
         </div>
       </div>
 
+      {/* LISTA DE PACIENTES */}
       <div className="space-y-4">
-        {filteredPatients.length === 0 ? (
+        {paginatedPatients.length === 0 ? (
           <div className="bg-white p-12 rounded-[2rem] border border-slate-100 shadow-sm text-center">
             <p className="text-slate-500 font-medium">No se encontraron pacientes bajo este filtro o búsqueda.</p>
           </div>
         ) : (
-          filteredPatients.map((paciente) => {
+          paginatedPatients.map((paciente) => {
             const isExpanded = expandedPatientId === paciente.id;
             const isLoadingThisSession = loadingSessions[paciente.id];
+            
+            const estadoId = paciente.estado_paciente_id || (paciente.status ? 5 : 7);
+            const isInactivo = estadoId === 7;
+
+            // PAGINACIÓN INTERNA DE SESIONES
             const sesiones = patientSessions[paciente.id] || [];
-            const isActivo = paciente.status === 1 || paciente.status === true;
+            const currentSessionPage = sessionPages[paciente.id] || 1;
+            const totalSessionPages = Math.ceil(sesiones.length / sessionsPerPage);
+            const paginatedSesiones = sesiones.slice((currentSessionPage - 1) * sessionsPerPage, currentSessionPage * sessionsPerPage);
 
             return (
-              <div key={paciente.id} className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-teal-200 shadow-md ring-4 ring-teal-50' : 'border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-200'} ${!isActivo ? 'opacity-75 bg-slate-50/50' : ''}`}>
+              <div key={paciente.id} className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${isExpanded ? 'border-teal-200 shadow-md ring-4 ring-teal-50' : 'border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-200'} ${isInactivo ? 'opacity-75 bg-slate-50/50' : ''}`}>
                 
                 <div onClick={() => togglePatient(paciente.id)} className="p-6 flex flex-col sm:flex-row items-center gap-6 cursor-pointer select-none group">
                   <div className="flex items-center gap-5 flex-1 w-full">
-                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl border shadow-sm shrink-0 ${isActivo ? 'bg-teal-50 text-teal-700 border-teal-100' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl border shadow-sm shrink-0 ${estadoId === 5 ? 'bg-teal-50 text-teal-700 border-teal-100' : estadoId === 6 ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
                       {paciente.nombre?.substring(0,2).toUpperCase() || 'P'}
                     </div>
                     <div>
                       <div className="flex items-center gap-3">
-                        <h3 className={`font-bold text-xl transition-colors ${isActivo ? 'text-slate-800 group-hover:text-teal-600' : 'text-slate-500'}`}>
+                        <h3 className={`font-bold text-xl transition-colors ${estadoId !== 7 ? 'text-slate-800 group-hover:text-teal-600' : 'text-slate-500'}`}>
                           {paciente.nombre} {paciente.apellido_paterno} {paciente.apellido_materno}
                         </h3>
-                        {!isActivo && <span className="px-2 py-0.5 bg-rose-100 text-rose-600 text-[10px] font-bold uppercase rounded-md">Inactivo</span>}
                       </div>
                       <div className="flex items-center gap-3 mt-1">
                         <p className="text-sm font-medium text-slate-500">{paciente.email || 'Sin correo'}</p>
@@ -242,18 +308,25 @@ export default function Pacientes() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleToggleStatus(paciente.id); }}
-                      className={`p-2 rounded-xl transition-colors ${isActivo ? 'text-rose-400 hover:text-rose-600 hover:bg-rose-50' : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'}`}
-                      title={isActivo ? "Desactivar Paciente" : "Reactivar Paciente"}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <select
+                      value={estadoId}
+                      onChange={(e) => handleChangeEstadoPaciente(paciente.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()} 
+                      className={`text-[10px] font-bold rounded-lg px-2.5 py-2 outline-none border transition-colors cursor-pointer uppercase tracking-wider ${
+                        estadoId === 6 ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                        estadoId === 7 ? 'bg-rose-50 text-rose-700 border-rose-200' : 
+                        'bg-teal-50 text-teal-700 border-teal-200'
+                      }`}
                     >
-                      <Power className="w-5 h-5" />
-                    </button>
+                      <option value="5">ACTIVO</option>
+                      <option value="6">ALTA TERAPÉUTICA</option>
+                      <option value="7">BAJA / INACTIVO</option>
+                    </select>
 
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleOpenEditPaciente(paciente); }}
-                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-700 rounded-xl transition-colors"
+                      className="p-2 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-colors border border-transparent hover:border-teal-100"
                       title="Editar Expediente"
                     >
                       <Edit className="w-5 h-5" />
@@ -265,17 +338,30 @@ export default function Pacientes() {
                   </div>
                 </div>
 
+                {/* CONTENIDO DESPLEGABLE: SESIONES */}
                 {isExpanded && (
                   <div className="border-t border-slate-100 bg-slate-50/50 p-6 md:p-8 animate-in slide-in-from-top-4 duration-300">
                     <div className="flex items-center justify-between mb-6">
                       <h4 className="font-bold text-slate-700 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-teal-500" /> Historial de Sesiones
                       </h4>
-                      {isActivo && (
-                        <button onClick={() => handleOpenNuevaSesion(paciente.id)} className="text-sm font-bold text-white hover:bg-teal-700 bg-teal-600 px-4 py-2 rounded-xl transition-colors shadow-sm">
-                          + Agendar Sesión
-                        </button>
-                      )}
+                      
+                      <div className="flex items-center gap-4">
+                        {/* CONTROLES DE PAGINACIÓN DE SESIONES */}
+                        {totalSessionPages > 1 && (
+                          <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200 shadow-sm">
+                            <button onClick={() => handleSessionPageChange(paciente.id, -1)} disabled={currentSessionPage === 1} className="p-1 text-slate-400 hover:text-teal-600 disabled:opacity-30"><ChevronLeft className="w-4 h-4"/></button>
+                            <span className="text-xs font-bold text-slate-500">{currentSessionPage} de {totalSessionPages}</span>
+                            <button onClick={() => handleSessionPageChange(paciente.id, 1)} disabled={currentSessionPage === totalSessionPages} className="p-1 text-slate-400 hover:text-teal-600 disabled:opacity-30"><ChevronRight className="w-4 h-4"/></button>
+                          </div>
+                        )}
+
+                        {estadoId !== 7 && (
+                          <button onClick={() => handleOpenNuevaSesion(paciente.id)} className="text-sm font-bold text-white hover:bg-teal-700 bg-teal-600 px-4 py-2 rounded-xl transition-colors shadow-sm">
+                            + Agendar Sesión
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {isLoadingThisSession ? (
@@ -288,8 +374,7 @@ export default function Pacientes() {
                       </div>
                     ) : (
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {sesiones.map((sesion) => {
-                          // AQUÍ ASEGURAMOS QUE LEA LA NOTA COMO LA MANDA LARAVEL
+                        {paginatedSesiones.map((sesion) => {
                           const notaActual = sesion.nota;
                           const badge = getBadgeInfo(notaActual);
                           
@@ -299,12 +384,27 @@ export default function Pacientes() {
                                  <div className="flex justify-between items-start mb-4">
                                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
                                      <Calendar className="w-4 h-4 text-slate-400" />
-                                     {/* AQUÍ APLICAMOS LA FECHA FORMATEADA */}
                                      {formatShortDate(sesion.fecha_sesion || sesion.created_at)}
                                    </div>
-                                   <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
-                                     Sesión #{sesion.numero_sesion}
-                                   </span>
+                                   <div className="flex items-center gap-2">
+                                     <select
+                                       value={sesion.estado_sesion_id || 12}
+                                       onChange={(e) => actualizarEstadoSesion(paciente.id, sesion.id, e.target.value)}
+                                       className={`text-[10px] font-bold rounded-md px-2 py-1 outline-none border transition-colors cursor-pointer uppercase tracking-wider ${
+                                         sesion.estado_sesion_id === 13 ? 'bg-teal-50 text-teal-700 border-teal-200' : 
+                                         sesion.estado_sesion_id === 12 ? 'bg-blue-50 text-blue-700 border-blue-200' : 
+                                         'bg-rose-50 text-rose-700 border-rose-200' 
+                                       }`}
+                                     >
+                                       <option value="12">PROGRAMADA</option>
+                                       <option value="13">COMPLETADA</option>
+                                       <option value="14">CANCELADA</option>
+                                       <option value="15">NO ASISTIÓ</option>
+                                     </select>
+                                     <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">
+                                       Sesión #{sesion.numero_sesion}
+                                     </span>
+                                   </div>
                                  </div>
                                  <div className="mb-4">
                                    <p className="text-sm font-bold text-slate-800">{sesion.tipo_sesion?.valor || 'Sesión General'}</p>
@@ -346,6 +446,31 @@ export default function Pacientes() {
           })
         )}
       </div>
+
+      {/* CONTROLES DE PAGINACIÓN DE PACIENTES MAIN LIST */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-6 pt-6">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-teal-50 hover:text-teal-600 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-500 transition-colors shadow-sm"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          
+          <span className="text-sm font-bold text-slate-500 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm">
+            Página <span className="text-teal-600">{currentPage}</span> de {totalPages}
+          </span>
+          
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-teal-50 hover:text-teal-600 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-500 transition-colors shadow-sm"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       <NuevaSesionSlideover isOpen={isNuevaSesionOpen} onClose={() => setIsNuevaSesionOpen(false)} onSuccess={handleSesionSuccess} pacienteId={selectedPacienteIdForSesion} />
       <RedactarNotaSlideover isOpen={isNotaOpen} onClose={() => setIsNotaOpen(false)} onSuccess={handleSesionSuccess} sesionId={selectedSesionId} notaExistente={selectedNota} />

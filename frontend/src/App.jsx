@@ -1,4 +1,3 @@
-// Archivo: src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -11,6 +10,8 @@ import Dashboard from './pages/dashboard/Dashboard';
 import Pacientes from './pages/patients/Pacientes'; 
 import Agenda from './pages/agenda/Agenda';
 import AnalisisIA from './pages/analisis/AnalisisIA'; 
+import Expedientes from './pages/expedientes/Expedientes'; 
+import Reportes from './pages/reportes/Reportes';
 
 function App() {
   return (
@@ -24,13 +25,13 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/pacientes" element={<Pacientes />} />
-              
-              {/* <-- Reemplazamos el div estático por el componente real de FullCalendar --> */}
               <Route path="/agenda" element={<Agenda />} />
-              
               <Route path="/analisis-ia" element={<AnalisisIA />} />
-              <Route path="/expedientes" element={<div className="p-8 font-bold">Expedientes...</div>} />
-              <Route path="/reportes" element={<div className="p-8 font-bold">Reportes...</div>} />
+              
+              {/* <-- Reemplazamos el div estático por el componente real de Expedientes --> */}
+              <Route path="/expedientes" element={<Expedientes />} />
+              
+              <Route path="/reportes" element={<Reportes />} />
             </Route>
           </Route>
 
